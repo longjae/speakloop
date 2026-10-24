@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "name": "SpeakLoop",
+    "slug": "speakloop",
+    "scheme": "speakloop",
+    "plugins": ["expo-router"],
+    "experiments": {"typedRoutes": true},
+    "ios": {"supportsTablet": true},
+    "android": {"package": "com.speakloop.app"}
+  }
+}

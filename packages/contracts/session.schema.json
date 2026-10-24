@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PracticeSession",
+  "type": "object",
+  "required": ["id", "mode", "interaction_type", "status", "created_at"],
+  "properties": {
+    "id": {"type": "string", "format": "uuid"},
+    "mode": {"enum": ["opic", "daily"]},
+    "interaction_type": {"enum": ["recorded", "turn"]},
+    "status": {"enum": ["created", "recording", "processing", "ready", "failed", "cancelled"]},
+    "created_at": {"type": "string", "format": "date-time"}
+  },
+  "additionalProperties": false
+}
