@@ -1,0 +1,12 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+node_modules/
+.expo/
+dist/
+build/
+__pycache__/
+.pytest_cache/
+.venv/
+*.pyc
