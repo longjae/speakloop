@@ -85,9 +85,6 @@ async def owned_session(session_id: UUID, user: tuple[str, str]):
 
 
 def transcribe_audio(audio: bytes, mime_type: str) -> str:
-    import google.auth
-    from google.auth.transport.requests import Request
-
     project = os.getenv("GOOGLE_CLOUD_PROJECT", "")
     api_key = os.getenv("GOOGLE_API_KEY", "")
     model = os.getenv("STT_MODEL", "gemini-3.5-transcribe")
@@ -95,14 +92,11 @@ def transcribe_audio(audio: bytes, mime_type: str) -> str:
         raise RuntimeError("Unsupported STT model")
     if not project:
         raise RuntimeError("Vertex AI project is not configured")
+    if not api_key:
+        raise RuntimeError("Vertex AI API key is not configured")
     location = os.getenv("GOOGLE_CLOUD_LOCATION", "global")
     endpoint = f"https://aiplatform.googleapis.com/v1/projects/{project}/locations/{location}/publishers/google/models/{model}:generateContent"
-    if api_key:
-        headers = {"x-goog-api-key": api_key}
-    else:
-        credentials, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
-        credentials.refresh(Request())
-        headers = {"Authorization": f"Bearer {credentials.token}"}
+    headers = {"x-goog-api-key": api_key}
     payload = {"contents": [{"role": "user", "parts": [{"inlineData": {"mimeType": mime_type, "data": base64.b64encode(audio).decode("ascii")}}]}], "generationConfig": {"audioTranscriptionConfig": {"mode": "VERBATIM", "languageCodes": ["en-US"]}}}
     response = httpx.post(endpoint, headers=headers, json=payload, timeout=90)
     response.raise_for_status()
