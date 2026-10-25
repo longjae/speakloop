@@ -1,31 +1,156 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { getSession, PracticeSession } from '../../lib/api';
+import { ActivityIndicator, Button, Platform, ScrollView, StyleSheet, Text, TextInput } from 'react-native';
+import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioPlayer, useAudioRecorder, useAudioRecorderState } from 'expo-audio';
+import { File } from 'expo-file-system';
+import { randomUUID } from 'expo-crypto';
+import { editTranscript, getScenario, getSession, listUtterances, PracticeSession, reserveUpload, Scenario, transcribeUpload, Utterance } from '../../lib/api';
+import { supabase } from '../../lib/supabase';
 
 export default function SessionDetail() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, scenarioId } = useLocalSearchParams<{ id: string; scenarioId?: string }>();
   const [session, setSession] = useState<PracticeSession | null>(null);
+  const [scenario, setScenario] = useState<Scenario | null>(null);
   const [error, setError] = useState('');
+  const [recordingUri, setRecordingUri] = useState<string | null>(null);
+  const [durationMs, setDurationMs] = useState(0);
+  const [consent, setConsent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [utterance, setUtterance] = useState<Utterance | null>(null);
+  const [uploadedId, setUploadedId] = useState<string | null>(null);
+  const [editedText, setEditedText] = useState('');
+  const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, directory: 'document' });
+  const recorderState = useAudioRecorderState(recorder);
+  const player = useAudioPlayer(null);
 
   useEffect(() => {
     if (!id) return;
-    getSession(id).then(setSession).catch(cause => setError(cause instanceof Error ? cause.message : '세션을 불러올 수 없습니다.'));
+    getSession(id).then(value => {
+      setSession(value);
+      const selectedScenario = scenarioId ?? value.scenario_id;
+      if (selectedScenario) getScenario(selectedScenario).then(setScenario).catch(() => setError('시나리오를 불러올 수 없습니다.'));
+      listUtterances(id).then(result => {
+        const latest = result.items[0];
+        if (latest) {
+          setUtterance(latest);
+          setEditedText(latest.transcript_edited ?? latest.transcript_raw ?? '');
+        }
+      }).catch(() => {});
+    }).catch(cause => setError(cause instanceof Error ? cause.message : '세션을 불러올 수 없습니다.'));
   }, [id]);
 
-  return <View style={styles.page}>
+  useEffect(() => {
+    player.replace(recordingUri ? { uri: recordingUri } : null);
+  }, [player, recordingUri]);
+
+  async function startRecording() {
+    if (!consent) { setError('녹음·보관 안내를 확인하고 동의해 주세요.'); return; }
+    setBusy(true);
+    setError('');
+    try {
+      const permission = await AudioModule.requestRecordingPermissionsAsync();
+      if (!permission.granted) throw new Error('마이크 권한이 필요합니다. 기기 설정에서 허용해 주세요.');
+      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
+      setRecordingUri(null);
+      setUploadedId(null);
+      setUtterance(null);
+      setDurationMs(0);
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '녹음을 시작할 수 없습니다.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function stopRecording() {
+    setBusy(true);
+    setError('');
+    try {
+      const elapsed = recorderState.durationMillis;
+      await recorder.stop();
+      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
+      if (!recorder.uri || elapsed < 1000) throw new Error('녹음이 너무 짧습니다. 1초 이상 말해 주세요.');
+      setRecordingUri(recorder.uri);
+      setDurationMs(elapsed);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '녹음을 저장할 수 없습니다.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function playRecording() {
+    if (!recordingUri) return;
+    try {
+      await player.seekTo(0);
+      player.play();
+    } catch {
+      setError('녹음을 재생할 수 없습니다. 다시 녹음해 주세요.');
+    }
+  }
+
+  async function submitRecording() {
+    if (!recordingUri || !id || !supabase || !consent) return;
+    setBusy(true);
+    setError('');
+    try {
+      let uploadId = uploadedId;
+      if (!uploadId) {
+        const file = new File(recordingUri);
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const reservation = await reserveUpload(id, bytes.byteLength, durationMs, randomUUID());
+        const result = await supabase.storage.from('recordings').upload(reservation.path, bytes, { contentType: 'audio/mp4', upsert: false });
+        if (result.error) throw new Error('녹음 업로드에 실패했습니다. 다시 시도해 주세요.');
+        uploadId = reservation.upload_id;
+        setUploadedId(uploadId);
+      }
+      const resultUtterance = await transcribeUpload(id, uploadId);
+      setUtterance(resultUtterance);
+      setEditedText(resultUtterance.transcript_edited ?? resultUtterance.transcript_raw ?? '');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '전사를 완료할 수 없습니다.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveTranscript() {
+    if (!utterance) return;
+    setBusy(true);
+    setError('');
+    try {
+      const result = await editTranscript(utterance.id, editedText);
+      setUtterance(value => value ? { ...value, transcript_edited: result.transcript_edited } : value);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '전사를 저장할 수 없습니다.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <ScrollView contentContainerStyle={styles.page}>
     {!session && !error && <ActivityIndicator />}
     {error && <Text accessibilityRole="alert">{error}</Text>}
     {session && <>
-      <Text style={styles.title}>{session.mode === 'opic' ? 'OPIc 연습' : '일상 회화'}</Text>
-      <Text>상태: {session.status}</Text>
-      <Text>세션: {session.id}</Text>
-      <Text>녹음과 음성 분석은 다음 개발 단계에서 사용할 수 있습니다.</Text>
+      <Text style={styles.title}>{scenario?.title ?? (session.mode === 'opic' ? 'OPIc 연습' : '일상 회화')}</Text>
+      {scenario && <><Text style={styles.prompt}>{scenario.prompt}</Text><Text>목표: {scenario.goals.join(' · ')}</Text></>}
+      {Platform.OS === 'web' ? <Text>녹음은 Android·iOS 앱에서 이용해 주세요.</Text> : <>
+        <Text>녹음은 기기에 저장됩니다. 제출하면 비공개 저장소에 보관하고, 전사할 때 Google Vertex AI로 보냅니다.</Text>
+        <Button title={consent ? '녹음 안내 동의함' : '녹음 안내에 동의'} onPress={() => setConsent(value => !value)} />
+        <Text>녹음 시간: {Math.round((recorderState.isRecording ? recorderState.durationMillis : durationMs) / 1000)}초</Text>
+        {recorderState.isRecording ? <Button title="녹음 종료" disabled={busy} onPress={stopRecording} /> : <Button title={recordingUri ? '다시 녹음' : '녹음 시작'} disabled={busy || !consent} onPress={startRecording} />}
+        {recordingUri && !recorderState.isRecording && <><Button title="내 녹음 듣기" disabled={busy} onPress={playRecording} /><Button title={busy ? '처리 중…' : '녹음 제출·영어 전사'} disabled={busy} onPress={submitRecording} /></>}
+        {utterance && <><Text>전사 상태: {utterance.stt_status}</Text><Text>원본: {utterance.transcript_raw || '인식한 말이 없습니다. 다시 녹음해 주세요.'}</Text><TextInput accessibilityLabel="전사 수정" multiline value={editedText} onChangeText={setEditedText} style={styles.editor} /><Button title="수정한 전사 저장" disabled={busy || !editedText.trim()} onPress={saveTranscript} /></>}
+      </>}
     </>}
-  </View>;
+  </ScrollView>;
 }
 
 const styles = StyleSheet.create({
-  page: { flex: 1, padding: 24, justifyContent: 'center', gap: 16 },
+  page: { flexGrow: 1, padding: 24, justifyContent: 'center', gap: 16 },
   title: { fontSize: 24, fontWeight: 'bold' },
+  prompt: { fontSize: 18, lineHeight: 26 },
+  editor: { minHeight: 100, borderWidth: 1, borderColor: '#888', padding: 12, textAlignVertical: 'top' },
 });

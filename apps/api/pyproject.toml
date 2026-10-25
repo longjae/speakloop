@@ -2,7 +2,7 @@
 name = "speakloop-api"
 version = "0.1.0"
 requires-python = ">=3.12,<4"
-dependencies = ["fastapi==0.120.4", "uvicorn==0.38.0", "httpx==0.28.1", "PyJWT[crypto]==2.10.1"]
+dependencies = ["fastapi==0.120.4", "uvicorn==0.38.0", "httpx==0.28.1", "PyJWT[crypto]==2.10.1", "google-auth>=2.0,<3"]
 
 [project.optional-dependencies]
 test = ["pytest==8.4.2"]

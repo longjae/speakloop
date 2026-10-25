@@ -4,11 +4,24 @@ const apiUrl = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
 
 export type PracticeSession = {
   id: string;
+  scenario_id?: string | null;
   mode: 'opic' | 'daily';
   interaction_type: 'recorded' | 'turn';
   status: 'created' | 'recording' | 'processing' | 'ready' | 'failed' | 'cancelled';
   created_at: string;
 };
+
+export type Scenario = {
+  id: string;
+  mode: PracticeSession['mode'];
+  level: 'beginner' | 'intermediate';
+  title: string;
+  prompt: string;
+  goals: string[];
+  version: number;
+};
+
+export type Utterance = { id: string; transcript_raw: string | null; transcript_edited: string | null; stt_status: 'processing' | 'ready' | 'empty' | 'failed' };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!supabase || !apiUrl) throw new Error('앱의 API 주소와 Supabase 설정이 필요합니다.');
@@ -35,11 +48,19 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export function createSession(mode: PracticeSession['mode']): Promise<PracticeSession> {
+export function createSession(mode: PracticeSession['mode'], scenarioId?: string): Promise<PracticeSession> {
   return request('/v1/sessions', {
     method: 'POST',
-    body: JSON.stringify({ mode, interaction_type: 'recorded' }),
+    body: JSON.stringify({ mode, scenario_id: scenarioId, interaction_type: 'recorded' }),
   });
+}
+
+export function listScenarios(mode: PracticeSession['mode']): Promise<{ items: Scenario[]; next_cursor: string | null }> {
+  return request(`/v1/scenarios?mode=${mode}`);
+}
+
+export function getScenario(id: string): Promise<Scenario> {
+  return request(`/v1/scenarios/${encodeURIComponent(id)}`);
 }
 
 export function listSessions(): Promise<{ items: PracticeSession[]; next_cursor: string | null }> {
@@ -48,4 +69,20 @@ export function listSessions(): Promise<{ items: PracticeSession[]; next_cursor:
 
 export function getSession(id: string): Promise<PracticeSession> {
   return request(`/v1/sessions/${encodeURIComponent(id)}`);
+}
+
+export function reserveUpload(sessionId: string, sizeBytes: number, durationMs: number, idempotencyKey: string): Promise<{ upload_id: string; path: string }> {
+  return request(`/v1/sessions/${sessionId}/uploads`, { method: 'POST', body: JSON.stringify({ mime_type: 'audio/mp4', size_bytes: sizeBytes, duration_ms: durationMs, idempotency_key: idempotencyKey }) });
+}
+
+export function transcribeUpload(sessionId: string, uploadId: string): Promise<Utterance> {
+  return request(`/v1/sessions/${sessionId}/utterances`, { method: 'POST', body: JSON.stringify({ upload_id: uploadId }) });
+}
+
+export function editTranscript(utteranceId: string, text: string): Promise<{ id: string; transcript_edited: string }> {
+  return request(`/v1/utterances/${utteranceId}/transcript`, { method: 'PATCH', body: JSON.stringify({ text }) });
+}
+
+export function listUtterances(sessionId: string): Promise<{ items: Utterance[] }> {
+  return request(`/v1/sessions/${sessionId}/utterances`);
 }

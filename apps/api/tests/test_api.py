@@ -66,3 +66,36 @@ def test_jwt_audience_is_checked(monkeypatch):
     token = jwt.encode(claims, private_key, algorithm="RS256")
     response = client.get("/v1/me", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 401
+
+
+def test_vertex_transcript_uses_audio_and_preserves_raw_text(monkeypatch):
+    from app import main
+    monkeypatch.setenv("GOOGLE_API_KEY", "test-only")
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "speakloop-512602")
+    seen = {}
+
+    def fake_post(url, *, headers, json, timeout):
+        seen.update(url=url, headers=headers, body=json)
+        return SimpleNamespace(raise_for_status=lambda: None, json=lambda: {"candidates": [{"content": {"parts": [{"text": "Um, I went to the cafe."}]}}]})
+
+    monkeypatch.setattr(main.httpx, "post", fake_post)
+    assert main.transcribe_audio(b"sample", "audio/m4a") == "Um, I went to the cafe."
+    assert "/projects/speakloop-512602/locations/global/" in seen["url"]
+    assert seen["body"]["generationConfig"]["audioTranscriptionConfig"]["mode"] == "VERBATIM"
+    assert seen["body"]["contents"][0]["parts"][0]["inlineData"]["mimeType"] == "audio/m4a"
+    assert "test-only" not in str(seen["body"])
+
+
+def test_upload_rejects_unsupported_audio_before_reservation(monkeypatch):
+    from app import main
+
+    async def fake_owned_session(session_id, user):
+        return None
+
+    monkeypatch.setattr(main, "owned_session", fake_owned_session)
+    app.dependency_overrides[current_user] = lambda: ("00000000-0000-0000-0000-000000000001", "token")
+    try:
+        response = client.post("/v1/sessions/00000000-0000-0000-0000-000000000002/uploads", json={"mime_type": "text/plain", "size_bytes": 10, "duration_ms": 1000, "idempotency_key": "00000000-0000-0000-0000-000000000003"})
+        assert response.status_code == 422
+    finally:
+        app.dependency_overrides.clear()
