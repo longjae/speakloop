@@ -6,7 +6,15 @@
     "plugins": [
       "expo-router",
       "expo-web-browser",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-audio",
+        {
+          "recordAudioAndroid": true,
+          "enableBackgroundPlayback": false,
+          "microphonePermission": "SpeakLoop에서 말하기 연습을 녹음하려면 마이크 접근이 필요합니다."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
