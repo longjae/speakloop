@@ -2,6 +2,7 @@
 import os
 import hashlib
 import base64
+import logging
 from datetime import datetime, timezone
 from uuid import uuid4
 from uuid import UUID
@@ -14,6 +15,7 @@ from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
 app = FastAPI(title="SpeakLoop API", version="0.1.0")
+logger = logging.getLogger(__name__)
 
 
 class NewSession(BaseModel):
@@ -242,9 +244,25 @@ async def create_utterance(session_id: UUID, payload: NewUtterance, user: tuple[
         status = "ready" if transcript else "empty"
         rows = await query("utterances", key, "PATCH", params={"id": f"eq.{utterance_id}"}, body={"transcript_raw": transcript, "stt_status": status, "error_code": None, "updated_at": datetime.now(timezone.utc).isoformat()})
         return {k: rows[0][k] for k in ("id", "transcript_raw", "transcript_edited", "stt_status")}
-    except Exception:
+    except httpx.HTTPStatusError as exc:
+        try:
+            provider_error = exc.response.json().get("error", {})
+        except ValueError:
+            provider_error = {}
+        reasons = [item.get("reason") for item in provider_error.get("details", []) if isinstance(item, dict) and item.get("reason")]
+        logger.error(
+            "Transcription provider rejected request: http_status=%s code=%s status=%s reasons=%s",
+            exc.response.status_code,
+            provider_error.get("code"),
+            provider_error.get("status"),
+            reasons,
+        )
         await query("utterances", key, "PATCH", params={"id": f"eq.{utterance_id}"}, body={"stt_status": "failed", "error_code": "STT_PROVIDER_ERROR", "updated_at": datetime.now(timezone.utc).isoformat()})
-        raise HTTPException(503, "Transcription failed. Please retry")
+        raise HTTPException(503, "Transcription failed. Please retry") from exc
+    except Exception as exc:
+        logger.error("Transcription failed: error_type=%s", type(exc).__name__)
+        await query("utterances", key, "PATCH", params={"id": f"eq.{utterance_id}"}, body={"stt_status": "failed", "error_code": "STT_PROVIDER_ERROR", "updated_at": datetime.now(timezone.utc).isoformat()})
+        raise HTTPException(503, "Transcription failed. Please retry") from exc
 
 
 @app.patch("/v1/utterances/{utterance_id}/transcript")
