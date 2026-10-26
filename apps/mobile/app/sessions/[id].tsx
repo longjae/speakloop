@@ -19,6 +19,7 @@ export default function SessionDetail() {
   const [utterance, setUtterance] = useState<Utterance | null>(null);
   const [uploadedId, setUploadedId] = useState<string | null>(null);
   const [editedText, setEditedText] = useState('');
+  const [saveMessage, setSaveMessage] = useState('');
   const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, directory: 'document' });
   const recorderState = useAudioRecorderState(recorder);
   const player = useAudioPlayer(null);
@@ -120,9 +121,12 @@ export default function SessionDetail() {
     if (!utterance) return;
     setBusy(true);
     setError('');
+    setSaveMessage('');
     try {
       const result = await editTranscript(utterance.id, editedText);
       setUtterance(value => value ? { ...value, transcript_edited: result.transcript_edited } : value);
+      setEditedText(result.transcript_edited);
+      setSaveMessage('수정한 전사를 저장했습니다. 다시 들어와도 이 내용이 유지됩니다.');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '전사를 저장할 수 없습니다.');
     } finally {
@@ -142,7 +146,7 @@ export default function SessionDetail() {
         <Text>녹음 시간: {Math.round((recorderState.isRecording ? recorderState.durationMillis : durationMs) / 1000)}초</Text>
         {recorderState.isRecording ? <Button title="녹음 종료" disabled={busy} onPress={stopRecording} /> : <Button title={recordingUri ? '다시 녹음' : '녹음 시작'} disabled={busy || !consent} onPress={startRecording} />}
         {recordingUri && !recorderState.isRecording && <><Button title="내 녹음 듣기" disabled={busy} onPress={playRecording} /><Button title={busy ? '처리 중…' : '녹음 제출·영어 전사'} disabled={busy} onPress={submitRecording} /></>}
-        {utterance && <><Text>전사 상태: {utterance.stt_status}</Text><Text>원본: {utterance.transcript_raw || '인식한 말이 없습니다. 다시 녹음해 주세요.'}</Text><TextInput accessibilityLabel="전사 수정" multiline value={editedText} onChangeText={setEditedText} style={styles.editor} /><Button title="수정한 전사 저장" disabled={busy || !editedText.trim()} onPress={saveTranscript} /></>}
+        {utterance && <><Text>전사 상태: {utterance.stt_status}</Text><Text>원본: {utterance.transcript_raw || '인식한 말이 없습니다. 다시 녹음해 주세요.'}</Text><TextInput accessibilityLabel="전사 수정" multiline value={editedText} onChangeText={value => { setEditedText(value); setSaveMessage(''); }} style={styles.editor} /><Button title="수정한 전사 저장" disabled={busy || !editedText.trim()} onPress={saveTranscript} />{saveMessage && <Text accessibilityLiveRegion="polite">{saveMessage}</Text>}{utterance.transcript_edited && <Text>저장된 수정본: {utterance.transcript_edited}</Text>}</>}
       </>}
     </>}
   </ScrollView>;
