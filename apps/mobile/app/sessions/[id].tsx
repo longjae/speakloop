@@ -1,13 +1,14 @@
 import { Button, Text, TextInput } from '../../components/ui';
 import { colors, ui } from '../../lib/theme';
-import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, ScrollView, StyleSheet } from 'react-native';
+import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet } from 'react-native';
 import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioPlayer, useAudioRecorder, useAudioRecorderState } from 'expo-audio';
 import { File } from 'expo-file-system';
 import { randomUUID } from 'expo-crypto';
 import { editTranscript, getScenario, getSession, listUtterances, PracticeSession, reserveUpload, Scenario, transcribeUpload, Utterance } from '../../lib/api';
 import { supabase } from '../../lib/supabase';
+import { Analysis, deleteSession, listAnalyses, startAnalysis } from '../../lib/api';
 
 export default function SessionDetail() {
   const { id, scenarioId } = useLocalSearchParams<{ id: string; scenarioId?: string }>();
@@ -22,6 +23,8 @@ export default function SessionDetail() {
   const [editedText, setEditedText] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
   const [uploadMessage, setUploadMessage] = useState('');
+  const [analyses, setAnalyses] = useState<Analysis[]>([]);
+  const [analyzing, setAnalyzing] = useState(false);
   const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, directory: 'document' });
   const recorderState = useAudioRecorderState(recorder);
   const player = useAudioPlayer(null);
@@ -45,6 +48,27 @@ export default function SessionDetail() {
   useEffect(() => {
     player.replace(recordingUri ? { uri: recordingUri } : null);
   }, [player, recordingUri]);
+
+  useFocusEffect(useCallback(() => {
+    if (id) listAnalyses(id).then(result => setAnalyses(result.items)).catch(() => setError('피드백 이력을 불러오지 못했습니다. 다시 들어와 주세요.'));
+  }, [id]));
+
+  async function analyze() {
+    if (!id || !utterance) return;
+    setAnalyzing(true); setError('');
+    try {
+      const result = await startAnalysis(id, utterance.id);
+      router.push({ pathname: '/analyses/[id]', params: { id: result.id } });
+    } catch (cause) { setError(cause instanceof Error ? cause.message : '분석을 시작할 수 없습니다.'); }
+    finally { setAnalyzing(false); }
+  }
+
+  function removeSession() {
+    Alert.alert('연습 기록을 삭제할까요?', '녹음, 전사, 피드백과 AI 음성이 함께 삭제됩니다.', [
+      { text: '취소', style: 'cancel' },
+      { text: '삭제', style: 'destructive', onPress: () => { setBusy(true); deleteSession(id).then(() => router.replace('/')).catch(cause => setError(cause.message)).finally(() => setBusy(false)); } },
+    ]);
+  }
 
   async function startRecording() {
     setBusy(true);
@@ -151,11 +175,14 @@ export default function SessionDetail() {
       {Platform.OS === 'web' ? <Text>녹음은 Android·iOS 앱에서 이용해 주세요.</Text> : <>
         <Text>녹음은 먼저 기기에 저장됩니다. 제출하면 비공개 저장소에 보관하고, 영어 전사를 위해 Google Vertex AI로 보냅니다.</Text>
         <Text>녹음 시간: {Math.round((recorderState.isRecording ? recorderState.durationMillis : durationMs) / 1000)}초</Text>
-        {recorderState.isRecording ? <Button variant="primary" title="녹음 종료" disabled={busy} onPress={stopRecording} /> : <Button variant="primary" title={recordingUri ? '다시 녹음' : '녹음 시작'} disabled={busy} onPress={startRecording} />}
-        {recordingUri && !recorderState.isRecording && <><Button title="내 녹음 듣기" disabled={busy} onPress={playRecording} /><Button variant="primary" title={busy ? '처리 중…' : '녹음 제출·영어 전사'} disabled={busy} onPress={submitRecording} /></>}
+        {recorderState.isRecording ? <Button variant="primary" title="녹음 종료" disabled={busy || analyzing} onPress={stopRecording} /> : <Button variant="primary" title={recordingUri ? '다시 녹음' : '녹음 시작'} disabled={busy || analyzing} onPress={startRecording} />}
+        {recordingUri && !recorderState.isRecording && <><Button title="내 녹음 듣기" disabled={busy || analyzing} onPress={playRecording} /><Button variant="primary" title={busy ? '처리 중…' : '녹음 제출·영어 전사'} disabled={busy || analyzing} onPress={submitRecording} /></>}
         {uploadMessage && <Text style={styles.notice} accessibilityLiveRegion="polite">{uploadMessage}</Text>}
-        {utterance && <><Text style={ui.label}>TRANSCRIPT · 나의 발화</Text><Text style={ui.subtitle}>원본: {utterance.transcript_raw || '인식한 말이 없습니다. 다시 녹음해 주세요.'}</Text><Text style={ui.label}>인식 오류 수정</Text><TextInput accessibilityLabel="전사 수정" multiline value={editedText} onChangeText={value => { setEditedText(value); setSaveMessage(''); }} style={styles.editor} /><Button variant="primary" title="수정한 전사 저장" disabled={busy || !editedText.trim()} onPress={saveTranscript} />{saveMessage && <Text style={styles.notice} accessibilityLiveRegion="polite">{saveMessage}</Text>}{utterance.transcript_edited && <Text>저장된 수정본: {utterance.transcript_edited}</Text>}</>}
+        {utterance && <><Text style={ui.label}>TRANSCRIPT · 나의 발화</Text><Text style={ui.subtitle}>원본: {utterance.transcript_raw || '인식한 말이 없습니다. 다시 녹음해 주세요.'}</Text><Text style={ui.label}>인식 오류 수정</Text><TextInput accessibilityLabel="전사 수정" multiline value={editedText} onChangeText={value => { setEditedText(value); setSaveMessage(''); }} style={styles.editor} /><Button variant="primary" title="수정한 전사 저장" disabled={busy || analyzing || !editedText.trim()} onPress={saveTranscript} />{saveMessage && <Text style={styles.notice} accessibilityLiveRegion="polite">{saveMessage}</Text>}{utterance.transcript_edited && <Text>저장된 수정본: {utterance.transcript_edited}</Text>}</>}
       </>}
+      {utterance?.stt_status === 'ready' && <><Text>평가에는 수정 전 원본 전사만 사용합니다. 인식이 크게 틀렸다면 다시 녹음해 주세요.</Text><Button variant="primary" title="원본 발화 코칭 받기" loading={analyzing} disabled={busy || recorderState.isRecording} onPress={analyze} /></>}
+      {analyses.length > 0 && <><Text style={ui.cardTitle}>피드백 이력</Text>{analyses.map(item => <Button key={item.id} title={`${new Date(item.created_at).toLocaleDateString('ko-KR')} · ${item.status === 'ready' ? '피드백 보기' : item.status === 'failed' ? '분석 재시도' : '분석 중'}`} onPress={() => router.push({ pathname: '/analyses/[id]', params: { id: item.id } })} />)}</>}
+      <Button variant="quiet" title="이 연습 기록 삭제" disabled={busy || analyzing || recorderState.isRecording} onPress={removeSession} />
     </>}
   </ScrollView>;
 }

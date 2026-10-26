@@ -26,6 +26,10 @@
       "package": "com.speakloop.app",
       "runtimeVersion": {
         "policy": "appVersion"
+      },
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0C0E0F"
       }
     },
     "extra": {
@@ -41,6 +45,7 @@
     "owner": "tinkit-studio",
     "updates": {
       "url": "https://u.expo.dev/5d726a38-6ab6-4e58-bf9d-5dcc6be36958"
-    }
+    },
+    "icon": "./assets/icon.png"
   }
 }

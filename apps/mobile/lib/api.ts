@@ -28,9 +28,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const { data, error } = await supabase.auth.getSession();
   if (error || !data.session) throw new Error('다시 로그인해 주세요.');
   let response: Response;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 180_000);
   try {
     response = await fetch(`${apiUrl}${path}`, {
       ...init,
+      signal: controller.signal,
       headers: {
         Authorization: `Bearer ${data.session.access_token}`,
         'Content-Type': 'application/json',
@@ -38,11 +41,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       },
     });
   } catch {
-    throw new Error('서버에 연결할 수 없습니다.');
+    throw new Error(controller.signal.aborted ? '처리 시간이 길어지고 있습니다. 이력에서 진행 상태를 확인해 주세요.' : '서버에 연결할 수 없습니다.');
+  } finally {
+    clearTimeout(timeout);
   }
   if (!response.ok) {
     if (response.status === 401) throw new Error('로그인이 만료되었습니다. 다시 로그인해 주세요.');
-    if (response.status === 404) throw new Error('세션을 찾을 수 없습니다.');
+    if (response.status === 404) throw new Error('기록을 찾을 수 없습니다.');
+    const detail = await response.json().catch(() => null);
+    const message = detail?.error?.message;
+    if (typeof message === 'string' && /[가-힣]/.test(message)) throw new Error(message);
     throw new Error(`요청에 실패했습니다 (${response.status}).`);
   }
   return response.json() as Promise<T>;
@@ -86,3 +94,27 @@ export function editTranscript(utteranceId: string, text: string): Promise<{ id:
 export function listUtterances(sessionId: string): Promise<{ items: Utterance[] }> {
   return request(`/v1/sessions/${sessionId}/utterances`);
 }
+
+export type Feedback = {
+  summary: string;
+  strengths: { text: string; evidence: string }[];
+  improvements: { category: string; original: string; corrected: string; reason: string }[];
+  improved_example: string;
+  next_practice: string;
+};
+export type Analysis = {
+  id: string; session_id: string; utterance_id: string; mode: PracticeSession['mode'];
+  status: 'processing' | 'ready' | 'failed'; feedback_json: Feedback | null;
+  input_source: 'original'; input_text: string; rubric_version: string;
+  audio_status: 'none' | 'processing' | 'ready' | 'failed'; created_at: string;
+};
+export type AudioGuide = { id: string; status: Analysis['audio_status']; playback_url: string | null; expires_in: number };
+export function startAnalysis(sessionId: string, utteranceId: string): Promise<Analysis> {
+  return request(`/v1/sessions/${sessionId}/analysis`, { method: 'POST', body: JSON.stringify({ utterance_id: utteranceId }) });
+}
+export function getAnalysis(id: string): Promise<Analysis> { return request(`/v1/analyses/${id}`); }
+export function listAnalyses(sessionId: string): Promise<{ items: Analysis[] }> { return request(`/v1/sessions/${sessionId}/analyses`); }
+export function createAudioGuide(id: string): Promise<AudioGuide> { return request('/v1/audio-guides', { method: 'POST', body: JSON.stringify({ source_type: 'analysis', source_id: id }) }); }
+export function getAudioGuide(id: string): Promise<AudioGuide> { return request(`/v1/audio-guides/${id}`); }
+export function deleteAnalysis(id: string): Promise<{ deleted: boolean }> { return request(`/v1/analyses/${id}`, { method: 'DELETE' }); }
+export function deleteSession(id: string): Promise<{ deleted: boolean }> { return request(`/v1/sessions/${id}`, { method: 'DELETE' }); }
