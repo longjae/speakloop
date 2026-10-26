@@ -92,7 +92,7 @@ FastAPI: JWT 검증, 소유권 확인, 요청 제한, 작업 상태, 공급자 �
 
 ### 공급자 설정 계약
 
-**S2 전사 공급자 결정(2026-10-25)**: Google Cloud Vertex AI의 `gemini-3.5-transcribe`를 사용한다. `speakloop-512602` 프로젝트에서 Agent Platform API를 사용 설정했다. 실제 녹음은 사용자 동의 후 비공개 Supabase Storage에 저장하고, 서버가 전사 요청 시 Vertex AI에 보낸다. 모델의 사용량은 과금될 수 있다. 이 계정의 무료 체험 크레딧 잔액은 현재 권한으로 확인하지 못했으므로 무료라고 표시하지 않는다. 서버 인증은 운영 환경에서 ADC/워크로드 ID 연동을 우선하고, 테스트용 API 키를 쓸 때는 서버의 비밀 환경 변수 `GOOGLE_API_KEY`에만 둔다. 앱에 키를 넣지 않는다. [모델 문서](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/gemini/3-5-transcribe), [가격](https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing), [데이터 처리](https://docs.cloud.google.com/gemini-enterprise-agent-platform/resources/zero-data-retention)
+**S2 전사 공급자 결정(2026-10-25)**: Google Cloud Vertex AI의 `gemini-3.5-transcribe`를 사용한다. `speakloop-512602` 프로젝트에서 Agent Platform API를 사용 설정했다. 실제 녹음은 사용자가 제출할 때 비공개 Supabase Storage에 저장하고, 서버가 전사 요청 시 Vertex AI에 보낸다. 모델의 사용량은 과금될 수 있다. 이 계정의 무료 체험 크레딧 잔액은 현재 권한으로 확인하지 못했으므로 무료라고 표시하지 않는다. 서버 인증은 운영 환경에서 ADC/워크로드 ID 연동을 우선하고, 테스트용 API 키를 쓸 때는 서버의 비밀 환경 변수 `GOOGLE_API_KEY`에만 둔다. 앱에 키를 넣지 않는다. [모델 문서](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/gemini/3-5-transcribe), [가격](https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing), [데이터 처리](https://docs.cloud.google.com/gemini-enterprise-agent-platform/resources/zero-data-retention)
 
 환경 변수 예: `STT_PROVIDER`, `STT_MODEL`, `LLM_PROVIDER`, `LLM_MODEL`, `TTS_PROVIDER`, `TTS_MODEL`, `TTS_VOICE`, `REALTIME_PROVIDER`, `REALTIME_MODEL`. 각 어댑터는 `transcribe(audio)`, `coach(context)`, `synthesize(text)`, `create_realtime_session(options)` 인터페이스를 구현한다. 모델명은 배포 환경에서 선택하고 운영 시작 시 지원 상태·가격·지역·품질을 확인한다. 특정 모델 문자열을 제품 계약이나 DB enum에 넣지 않는다.
 
@@ -206,7 +206,7 @@ FastAPI: JWT 검증, 소유권 확인, 요청 제한, 작업 상태, 공급자 �
 
 ## 10. 개인정보·보안
 
-1. 녹음·전사·분석은 개인정보로 취급한다. 첫 녹음 전 수집 목적, AI 공급자 전송, 보관 기간, 삭제 방법을 한국어로 알리고 동의를 기록한다. 미동의 시 녹음형 기능을 시작하지 않는다.
+1. 녹음·전사·분석은 개인정보로 취급한다. 녹음 화면에서 처리 목적과 AI 공급자 전송을 한국어로 알린다. 마이크 권한은 기기 녹음에 사용하고, 서버 업로드는 사용자가 **녹음 제출·영어 전사**를 누를 때 시작한다. 매 세션 동의 버튼은 두지 않는다. 보관 기간·삭제 방법과 별도 동의 기록의 필요 여부는 출시 전 법률·운영 검토로 확정한다.
 2. **기본 보관 정책 제안**: 원본 음성 30일, 생성 음성 30일, 전사·분석 이력은 계정이 유지되는 동안 보관. 사용자가 세션을 삭제하면 연결된 DB/Storage 자료를 삭제 작업으로 처리한다. 확정 전 법률·운영 검토가 필요하다.
 3. 공유는 명시적 선택이다. 미리보기에서 포함할 항목을 고르고 OS 공유 시트를 연다. 서버의 공개 URL을 만들지 않는 방식을 기본으로 한다.
 4. HTTPS 전송, 비공개 Storage, RLS·소유권 검사, 서버 비밀키 관리, 짧은 수명의 음성 접근 URL, 업로드 형식/크기/길이 제한, 악성 파일 검사 경로를 둔다. signed URL은 만료 전 회수가 쉽지 않으므로 짧게 발급한다. [Storage signed URL](https://supabase.com/docs/guides/storage/serving/downloads)
