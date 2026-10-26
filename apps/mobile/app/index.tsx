@@ -1,10 +1,14 @@
+import { Button, Text, TextInput, Brand } from '../components/ui';
+import { colors, ui } from '../lib/theme';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Button, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { configured, supabase } from '../lib/supabase';
 import { authRedirectUrl, completeAuthFromUrl, googleLoginEnabled, recoveryRedirectUrl, signInWithGoogle } from '../lib/auth';
 import { listSessions, PracticeSession } from '../lib/api';
+
+const sessionStatus: Record<PracticeSession['status'], string> = { created: '연습 기록', recording: '녹음 중', processing: '처리 중', ready: '완료', failed: '재시도 필요', cancelled: '종료됨' };
 
 export default function Home() {
   const [loading, setLoading] = useState(true);
@@ -98,32 +102,37 @@ export default function Home() {
     listSessions().then(result => setSessions(result.items)).catch(error => setMessage(error.message));
   }, [signedIn]));
 
-  if (loading) return <View style={styles.page}><ActivityIndicator /></View>;
+  if (loading) return <View style={styles.page}><ActivityIndicator color={colors.mint} /></View>;
   if (!configured) return <View style={styles.page}><Text>Supabase 공개 설정을 .env에 입력해 주세요.</Text></View>;
-  return <View style={styles.page}>
-    <Text style={styles.title}>SpeakLoop</Text>
+  return <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
+    <Brand />
     {signedIn ? <>
-      <Text>연습 모드를 선택하세요.</Text>
-      <View style={styles.card}><Text>OPIc 연습</Text><Button color="#22B89F" title="시나리오 선택" disabled={busy} onPress={() => router.push({ pathname: '/scenarios/[mode]', params: { mode: 'opic' } })} /></View>
-      <View style={styles.card}><Text>일상 회화</Text><Button color="#22B89F" title="시나리오 선택" disabled={busy} onPress={() => router.push({ pathname: '/scenarios/[mode]', params: { mode: 'daily' } })} /></View>
-      <Text>최근 연습</Text>
-      {sessions.map(session => <Button color="#22B89F" key={session.id} title={`${session.mode === 'opic' ? 'OPIc' : '일상 회화'} · ${session.status}`} onPress={() => router.push({ pathname: '/sessions/[id]', params: { id: session.id } })} />)}
-      <Button color="#22B89F" title="로그아웃" onPress={() => supabase?.auth.signOut()} />
+      <Text style={styles.title}>오늘도, 한 번 더 말해요.</Text>
+      <Text>작은 연습이 쌓여 자연스러운 영어가 됩니다.</Text>
+      <Text style={ui.label}>PRACTICE MODES</Text>
+      <View style={styles.card}><Text style={ui.cardTitle}>OPIc 연습</Text><Text>질문에 답하며 나만의 이야기를 연습해요.</Text><Button title="시나리오 선택" disabled={busy} onPress={() => router.push({ pathname: '/scenarios/[mode]', params: { mode: 'opic' } })} /></View>
+      <View style={styles.card}><Text style={ui.cardTitle}>일상 회화</Text><Text>실제 상황에서 바로 쓸 수 있는 영어.</Text><Button title="시나리오 선택" disabled={busy} onPress={() => router.push({ pathname: '/scenarios/[mode]', params: { mode: 'daily' } })} /></View>
+      <Text style={ui.label}>RECENT PRACTICE · 최근 연습</Text>
+      {sessions.length === 0 && <Text>첫 연습을 시작하면 여기에 기록됩니다.</Text>}
+      {sessions.map(session => <Button key={session.id} title={`${session.mode === 'opic' ? 'OPIc' : '일상 회화'} · ${sessionStatus[session.status]}`} onPress={() => router.push({ pathname: '/sessions/[id]', params: { id: session.id } })} />)}
+      <Button variant="quiet" title="로그아웃" onPress={() => supabase?.auth.signOut()} />
     </> : <>
-      <TextInput style={styles.input} placeholder="이메일" autoCapitalize="none" value={email} onChangeText={setEmail} />
+      <Text style={styles.title}>말하기의 시작을 가볍게.</Text>
+      <Text>나의 영어를 듣고, 다듬고, 다시 말해요.</Text>
+      <TextInput style={styles.input} placeholder="이메일" keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail} />
       <TextInput style={styles.input} placeholder="비밀번호" secureTextEntry value={password} onChangeText={setPassword} />
-      <Button color="#22B89F" title="로그인" disabled={busy} onPress={signIn} />
-      <Button color="#22B89F" title="계정 만들기" disabled={busy} onPress={signUp} />
-      <Button color="#22B89F" title="비밀번호 재설정" disabled={busy} onPress={resetPassword} />
-      {Platform.OS !== 'web' && googleAvailable && <Button color="#22B89F" title="Google로 로그인" disabled={busy} onPress={googleSignIn} />}
+      <Button variant="primary" title="로그인" disabled={busy} onPress={signIn} />
+      <Button title="계정 만들기" disabled={busy} onPress={signUp} />
+      <Button variant="quiet" title="비밀번호 재설정" disabled={busy} onPress={resetPassword} />
+      {Platform.OS !== 'web' && googleAvailable && <Button title="Google로 로그인" disabled={busy} onPress={googleSignIn} />}
     </>}
-    <Text>{message}</Text>
-  </View>;
+    {message ? <Text accessibilityLiveRegion="polite">{message}</Text> : null}
+  </ScrollView>;
 }
 
 const styles = StyleSheet.create({
-  page: { flex: 1, padding: 24, justifyContent: 'center', gap: 14 },
-  title: { fontSize: 28, fontWeight: 'bold' },
-  input: { padding: 12, borderWidth: 1, borderColor: '#999', borderRadius: 8 },
-  card: { padding: 18, borderWidth: 1, borderColor: '#ddd', borderRadius: 8, gap: 6 },
+  page: { ...ui.page, paddingTop: 32, gap: 20 },
+  title: { ...ui.title },
+  input: { ...ui.input },
+  card: { ...ui.card },
 });

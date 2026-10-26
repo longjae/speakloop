@@ -1,5 +1,7 @@
+import { Button, Text, TextInput } from '../components/ui';
+import { colors, ui } from '../lib/theme';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Button, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
 import { completeAuthFromUrl } from '../lib/auth';
@@ -48,17 +50,17 @@ export default function ResetPassword() {
 
   return <View style={styles.page}>
     <Text style={styles.title}>비밀번호 재설정</Text>
-    {!incomingUrl && <ActivityIndicator />}
+    {!incomingUrl && <ActivityIndicator color={colors.mint} />}
     {ready && <>
       <TextInput style={styles.input} placeholder="새 비밀번호 (8자 이상)" secureTextEntry value={password} onChangeText={setPassword} />
-      <Button color="#22B89F" title="비밀번호 변경" disabled={busy} onPress={changePassword} />
+      <Button variant="primary" title="비밀번호 변경" disabled={busy} onPress={changePassword} />
     </>}
-    <Text accessibilityRole="alert">{message}</Text>
+    <Text style={ui.error} accessibilityRole="alert">{message}</Text>
   </View>;
 }
 
 const styles = StyleSheet.create({
-  page: { flex: 1, padding: 24, justifyContent: 'center', gap: 14 },
-  title: { fontSize: 28, fontWeight: 'bold' },
-  input: { padding: 12, borderWidth: 1, borderColor: '#999', borderRadius: 8 },
+  page: { ...ui.page, justifyContent: 'center' },
+  title: { ...ui.title },
+  input: { ...ui.input },
 });

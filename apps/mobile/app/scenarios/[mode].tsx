@@ -1,6 +1,8 @@
+import { Button, Text } from '../../components/ui';
+import { colors, ui } from '../../lib/theme';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Button, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { createSession, listScenarios, PracticeSession, Scenario } from '../../lib/api';
 
 export default function ScenarioList() {
@@ -34,22 +36,22 @@ export default function ScenarioList() {
 
   return <ScrollView contentContainerStyle={styles.page}>
     <Text style={styles.title}>{validMode === 'opic' ? 'OPIc' : '일상 회화'} 시나리오</Text>
-    {loading && <ActivityIndicator />}
-    {error && <Text accessibilityRole="alert">{error}</Text>}
+    {loading && <ActivityIndicator color={colors.mint} />}
+    {error && <Text style={ui.error} accessibilityRole="alert">{error}</Text>}
     {!loading && !error && items.length === 0 && <Text>선택할 수 있는 시나리오가 없습니다.</Text>}
     {items.map(item => <View style={styles.card} key={item.id}>
       <Text style={styles.cardTitle}>{item.title}</Text>
       <Text>{item.level === 'beginner' ? '초급' : '중급'}</Text>
       <Text>{item.prompt}</Text>
       <Text>목표: {item.goals.join(' · ')}</Text>
-      <Button color="#22B89F" title="이 시나리오로 시작" disabled={busy} onPress={() => start(item)} />
+      <Button variant="primary" title="이 시나리오로 시작" disabled={busy} onPress={() => start(item)} />
     </View>)}
   </ScrollView>;
 }
 
 const styles = StyleSheet.create({
-  page: { padding: 24, gap: 16 },
-  title: { fontSize: 24, fontWeight: 'bold' },
-  card: { padding: 18, borderWidth: 1, borderColor: '#ddd', borderRadius: 8, gap: 10 },
-  cardTitle: { fontSize: 18, fontWeight: 'bold' },
+  page: { ...ui.page },
+  title: { ...ui.title },
+  card: { ...ui.card },
+  cardTitle: { ...ui.cardTitle },
 });
