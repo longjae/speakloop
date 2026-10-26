@@ -6,7 +6,7 @@ OPIc 준비와 일상 영어 회화를 함께 돕는 AI 말하기 코칭 모바�
 
 ## 현재 상태
 
-제품 요구사항과 S1 기반 코드를 정리했습니다. Supabase 프로젝트와 데이터베이스 마이그레이션을 연결했습니다. API를 Vercel에 배포했습니다. S2 시나리오 선택, 녹음·재생, 비공개 업로드, Vertex AI 영어 전사, 전사 수정 코드를 추가했습니다. S2 코드는 서버 비밀키 설정과 새 배포, 실제 Android 기기 검증이 남았습니다.
+S1 로그인·세션 기반 기능과 S2 시나리오 선택, 녹음·재생, 비공개 업로드, Vertex AI 영어 전사, 전사 수정 기능을 구현했습니다. Supabase 마이그레이션과 Vercel 운영 API 배포를 완료했고, Android 실기기에서 Google 로그인과 녹음→전사를 확인했습니다. 전사 수정본 재진입 확인과 S2 장애 사례·iOS 검증은 남았습니다. Android 테스트 앱은 EAS Update의 `preview` 채널로 화면·동작 변경을 받습니다.
 
 - [제품 요구사항 문서](docs/PRD.md): 14개 기능, 화면 흐름, API·DB 설계, 보안, 하네스·루프·그래프 설계, 6개 스프린트
 - 사용 기술: Expo/React Native, FastAPI, Supabase
@@ -22,9 +22,9 @@ OPIc 준비와 일상 영어 회화를 함께 돕는 AI 말하기 코칭 모바�
 
 모바일에는 `apps/mobile/.env.example`을 참고해 공개 Supabase URL과 publishable/anon 키, 기기에서 접근 가능한 API 주소를 설정합니다. 실제 기기에서는 Vercel에 배포한 HTTPS API 주소를 사용합니다. 서버에는 `apps/api/.env.example`의 값을 환경 변수로 제공합니다. 실제 비밀키는 모바일에 넣지 않습니다. Supabase 프로젝트에 S1과 S2 마이그레이션을 적용했습니다. URL과 키가 없으면 모바일은 설정 안내를 보이며 API의 인증 경로는 503을 반환합니다.
 
-S2 전사에는 Vercel 서버 환경 변수 `SUPABASE_SERVICE_ROLE_KEY`와 Vertex AI 인증이 필요합니다. 테스트용 Google Cloud 인증 키는 `GOOGLE_API_KEY`에 넣을 수 있습니다. 운영에서는 Google Cloud 애플리케이션 기본 인증 정보와 Vercel OIDC 연동을 권장합니다. `GOOGLE_CLOUD_PROJECT=speakloop-512602`, `GOOGLE_CLOUD_LOCATION=global`, `STT_MODEL=gemini-3.5-transcribe`는 Vercel 프로젝트에 설정했습니다. 키를 채팅이나 저장소에 넣지 않습니다. 녹음 제출은 사용량에 따라 과금될 수 있고, 사용자별 하루 예약 20회로 제한합니다.
+S2 전사는 Vercel 서버의 `SUPABASE_SERVICE_ROLE_KEY`와 `GOOGLE_API_KEY`를 사용합니다. `GOOGLE_CLOUD_PROJECT=speakloop-512602`, `GOOGLE_CLOUD_LOCATION=global`, `STT_MODEL=gemini-3.5-transcribe`도 설정했습니다. 키를 채팅이나 저장소에 넣지 않습니다. 녹음 제출은 사용량에 따라 과금될 수 있고, 사용자별 하루 예약 20회로 제한합니다.
 
-현재 S1 구현은 로그인·로그아웃·세션 복원 UI, 모드별 세션 생성·조회, JWT 검증 API, RLS 정책, fake 상태 그래프의 시작점입니다. 호스팅 Supabase에 마이그레이션을 적용하고 이메일 로그인과 세션 API를 검증했습니다. 실제 기기 검증은 Android 빌드 후 진행합니다.
+다음 개발 단계는 [PRD](docs/PRD.md)의 S3 코칭입니다. 구조화 피드백, 결과 화면, TTS 가이드, 분석 이력과 삭제를 구현합니다.
 
 ## 시작 순서
 
