@@ -19,6 +19,7 @@ export default function SessionDetail() {
   const [uploadedId, setUploadedId] = useState<string | null>(null);
   const [editedText, setEditedText] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
+  const [uploadMessage, setUploadMessage] = useState('');
   const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, directory: 'document' });
   const recorderState = useAudioRecorderState(recorder);
   const player = useAudioPlayer(null);
@@ -52,6 +53,8 @@ export default function SessionDetail() {
       await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
       setRecordingUri(null);
       setUploadedId(null);
+      setUploadMessage('');
+      setSaveMessage('');
       setUtterance(null);
       setDurationMs(0);
       await recorder.prepareToRecordAsync();
@@ -94,6 +97,7 @@ export default function SessionDetail() {
     if (!recordingUri || !id || !supabase) return;
     setBusy(true);
     setError('');
+    setUploadMessage('녹음을 업로드하고 있습니다…');
     try {
       let uploadId = uploadedId;
       if (!uploadId) {
@@ -105,11 +109,15 @@ export default function SessionDetail() {
         uploadId = reservation.upload_id;
         setUploadedId(uploadId);
       }
+      setUploadMessage('업로드 완료. 영어 전사를 만들고 있습니다…');
       const resultUtterance = await transcribeUpload(id, uploadId);
       setUtterance(resultUtterance);
       setEditedText(resultUtterance.transcript_edited ?? resultUtterance.transcript_raw ?? '');
+      setUploadMessage(resultUtterance.transcript_raw ? '업로드와 영어 전사가 완료됐습니다.' : '업로드는 완료됐지만 음성을 인식하지 못했습니다. 다시 녹음해 주세요.');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '전사를 완료할 수 없습니다.');
+      const message = cause instanceof Error ? cause.message : '전사를 완료할 수 없습니다.';
+      setError(message);
+      setUploadMessage(`처리 실패: ${message} 제출 버튼을 눌러 다시 시도해 주세요.`);
     } finally {
       setBusy(false);
     }
@@ -143,6 +151,7 @@ export default function SessionDetail() {
         <Text>녹음 시간: {Math.round((recorderState.isRecording ? recorderState.durationMillis : durationMs) / 1000)}초</Text>
         {recorderState.isRecording ? <Button title="녹음 종료" disabled={busy} onPress={stopRecording} /> : <Button title={recordingUri ? '다시 녹음' : '녹음 시작'} disabled={busy} onPress={startRecording} />}
         {recordingUri && !recorderState.isRecording && <><Button title="내 녹음 듣기" disabled={busy} onPress={playRecording} /><Button title={busy ? '처리 중…' : '녹음 제출·영어 전사'} disabled={busy} onPress={submitRecording} /></>}
+        {uploadMessage && <Text accessibilityLiveRegion="polite">{uploadMessage}</Text>}
         {utterance && <><Text>전사 상태: {utterance.stt_status}</Text><Text>원본: {utterance.transcript_raw || '인식한 말이 없습니다. 다시 녹음해 주세요.'}</Text><TextInput accessibilityLabel="전사 수정" multiline value={editedText} onChangeText={value => { setEditedText(value); setSaveMessage(''); }} style={styles.editor} /><Button title="수정한 전사 저장" disabled={busy || !editedText.trim()} onPress={saveTranscript} />{saveMessage && <Text accessibilityLiveRegion="polite">{saveMessage}</Text>}{utterance.transcript_edited && <Text>저장된 수정본: {utterance.transcript_edited}</Text>}</>}
       </>}
     </>}
