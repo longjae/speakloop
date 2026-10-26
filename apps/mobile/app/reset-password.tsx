@@ -51,7 +51,7 @@ export default function ResetPassword() {
     {!incomingUrl && <ActivityIndicator />}
     {ready && <>
       <TextInput style={styles.input} placeholder="새 비밀번호 (8자 이상)" secureTextEntry value={password} onChangeText={setPassword} />
-      <Button title="비밀번호 변경" disabled={busy} onPress={changePassword} />
+      <Button color="#22B89F" title="비밀번호 변경" disabled={busy} onPress={changePassword} />
     </>}
     <Text accessibilityRole="alert">{message}</Text>
   </View>;

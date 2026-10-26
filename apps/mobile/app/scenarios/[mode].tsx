@@ -42,7 +42,7 @@ export default function ScenarioList() {
       <Text>{item.level === 'beginner' ? '초급' : '중급'}</Text>
       <Text>{item.prompt}</Text>
       <Text>목표: {item.goals.join(' · ')}</Text>
-      <Button title="이 시나리오로 시작" disabled={busy} onPress={() => start(item)} />
+      <Button color="#22B89F" title="이 시나리오로 시작" disabled={busy} onPress={() => start(item)} />
     </View>)}
   </ScrollView>;
 }

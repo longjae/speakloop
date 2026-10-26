@@ -104,18 +104,18 @@ export default function Home() {
     <Text style={styles.title}>SpeakLoop</Text>
     {signedIn ? <>
       <Text>연습 모드를 선택하세요.</Text>
-      <View style={styles.card}><Text>OPIc 연습</Text><Button title="시나리오 선택" disabled={busy} onPress={() => router.push({ pathname: '/scenarios/[mode]', params: { mode: 'opic' } })} /></View>
-      <View style={styles.card}><Text>일상 회화</Text><Button title="시나리오 선택" disabled={busy} onPress={() => router.push({ pathname: '/scenarios/[mode]', params: { mode: 'daily' } })} /></View>
+      <View style={styles.card}><Text>OPIc 연습</Text><Button color="#22B89F" title="시나리오 선택" disabled={busy} onPress={() => router.push({ pathname: '/scenarios/[mode]', params: { mode: 'opic' } })} /></View>
+      <View style={styles.card}><Text>일상 회화</Text><Button color="#22B89F" title="시나리오 선택" disabled={busy} onPress={() => router.push({ pathname: '/scenarios/[mode]', params: { mode: 'daily' } })} /></View>
       <Text>최근 연습</Text>
-      {sessions.map(session => <Button key={session.id} title={`${session.mode === 'opic' ? 'OPIc' : '일상 회화'} · ${session.status}`} onPress={() => router.push({ pathname: '/sessions/[id]', params: { id: session.id } })} />)}
-      <Button title="로그아웃" onPress={() => supabase?.auth.signOut()} />
+      {sessions.map(session => <Button color="#22B89F" key={session.id} title={`${session.mode === 'opic' ? 'OPIc' : '일상 회화'} · ${session.status}`} onPress={() => router.push({ pathname: '/sessions/[id]', params: { id: session.id } })} />)}
+      <Button color="#22B89F" title="로그아웃" onPress={() => supabase?.auth.signOut()} />
     </> : <>
       <TextInput style={styles.input} placeholder="이메일" autoCapitalize="none" value={email} onChangeText={setEmail} />
       <TextInput style={styles.input} placeholder="비밀번호" secureTextEntry value={password} onChangeText={setPassword} />
-      <Button title="로그인" disabled={busy} onPress={signIn} />
-      <Button title="계정 만들기" disabled={busy} onPress={signUp} />
-      <Button title="비밀번호 재설정" disabled={busy} onPress={resetPassword} />
-      {Platform.OS !== 'web' && googleAvailable && <Button title="Google로 로그인" disabled={busy} onPress={googleSignIn} />}
+      <Button color="#22B89F" title="로그인" disabled={busy} onPress={signIn} />
+      <Button color="#22B89F" title="계정 만들기" disabled={busy} onPress={signUp} />
+      <Button color="#22B89F" title="비밀번호 재설정" disabled={busy} onPress={resetPassword} />
+      {Platform.OS !== 'web' && googleAvailable && <Button color="#22B89F" title="Google로 로그인" disabled={busy} onPress={googleSignIn} />}
     </>}
     <Text>{message}</Text>
   </View>;

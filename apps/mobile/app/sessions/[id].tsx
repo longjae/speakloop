@@ -149,10 +149,10 @@ export default function SessionDetail() {
       {Platform.OS === 'web' ? <Text>녹음은 Android·iOS 앱에서 이용해 주세요.</Text> : <>
         <Text>녹음은 먼저 기기에 저장됩니다. 제출하면 비공개 저장소에 보관하고, 영어 전사를 위해 Google Vertex AI로 보냅니다.</Text>
         <Text>녹음 시간: {Math.round((recorderState.isRecording ? recorderState.durationMillis : durationMs) / 1000)}초</Text>
-        {recorderState.isRecording ? <Button title="녹음 종료" disabled={busy} onPress={stopRecording} /> : <Button title={recordingUri ? '다시 녹음' : '녹음 시작'} disabled={busy} onPress={startRecording} />}
-        {recordingUri && !recorderState.isRecording && <><Button title="내 녹음 듣기" disabled={busy} onPress={playRecording} /><Button title={busy ? '처리 중…' : '녹음 제출·영어 전사'} disabled={busy} onPress={submitRecording} /></>}
+        {recorderState.isRecording ? <Button color="#22B89F" title="녹음 종료" disabled={busy} onPress={stopRecording} /> : <Button color="#22B89F" title={recordingUri ? '다시 녹음' : '녹음 시작'} disabled={busy} onPress={startRecording} />}
+        {recordingUri && !recorderState.isRecording && <><Button color="#22B89F" title="내 녹음 듣기" disabled={busy} onPress={playRecording} /><Button color="#22B89F" title={busy ? '처리 중…' : '녹음 제출·영어 전사'} disabled={busy} onPress={submitRecording} /></>}
         {uploadMessage && <Text accessibilityLiveRegion="polite">{uploadMessage}</Text>}
-        {utterance && <><Text>전사 상태: {utterance.stt_status}</Text><Text>원본: {utterance.transcript_raw || '인식한 말이 없습니다. 다시 녹음해 주세요.'}</Text><TextInput accessibilityLabel="전사 수정" multiline value={editedText} onChangeText={value => { setEditedText(value); setSaveMessage(''); }} style={styles.editor} /><Button title="수정한 전사 저장" disabled={busy || !editedText.trim()} onPress={saveTranscript} />{saveMessage && <Text accessibilityLiveRegion="polite">{saveMessage}</Text>}{utterance.transcript_edited && <Text>저장된 수정본: {utterance.transcript_edited}</Text>}</>}
+        {utterance && <><Text>전사 상태: {utterance.stt_status}</Text><Text>원본: {utterance.transcript_raw || '인식한 말이 없습니다. 다시 녹음해 주세요.'}</Text><TextInput accessibilityLabel="전사 수정" multiline value={editedText} onChangeText={value => { setEditedText(value); setSaveMessage(''); }} style={styles.editor} /><Button color="#22B89F" title="수정한 전사 저장" disabled={busy || !editedText.trim()} onPress={saveTranscript} />{saveMessage && <Text accessibilityLiveRegion="polite">{saveMessage}</Text>}{utterance.transcript_edited && <Text>저장된 수정본: {utterance.transcript_edited}</Text>}</>}
       </>}
     </>}
   </ScrollView>;
