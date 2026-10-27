@@ -2,8 +2,9 @@
 
 ## 범위
 
-- 원본 전사와 모드별 기준으로 구조화 피드백 생성. 원본 인용 검증, 강점 1~3개·교정 0~3개·영어 개선 예문·다음 연습.
-- 수정 전사는 저장하지만 원본 평가 입력으로 사용하지 않음. 발음·억양·공식 점수·OPIc 등급은 생성하지 않음.
+- 원본 녹음 오디오와 원본 전사, 모드별 기준으로 구조화 피드백 생성. 원본 인용 검증, 강점 1~3개·교정 0~3개·영어 개선 예문·다음 연습.
+- 수정 전사는 저장하지만 원본 평가 입력으로 사용하지 않음. 발음·억양·속도·멈춤은 오디오에서 들린 특징을 정성적으로 코칭한다. 구간·확신 수준을 표시하고 원본 구간 듣기를 제공한다. 공인 발음 점수·OPIc 등급은 생성하지 않는다.
+- 미국식(en-US)·영국식(en-GB) 연습 기준은 기기에 기억하고 분석마다 스냅샷으로 저장한다. 어휘·철자·발음 연습 방향과 지역 음성 선택에 반영하며 다른 억양을 오류로 간주하지 않는다. 분석·음성 캐시는 발화와 발음 기준별로 분리한다.
 - 분석 결과·근거·모드·원본 스냅샷·루브릭 버전 보존. 중복 탭은 기존 분석 반환. 실패만 최대 3회 시도, 사용자당 하루 20회 예약 제한.
 - 예문은 필요할 때 Vertex TTS로 생성해 비공개 WAV로 캐시. 5분 만료 재생 URL, 기기에서 0.8/1/1.2배 재생. 음성 실패가 텍스트 피드백을 막지 않음.
 - 세션별 피드백 이력·재열람, 피드백만 삭제, 녹음·전사·피드백·생성 음성을 포함한 연습 기록 삭제.
@@ -11,25 +12,27 @@
 
 기본 공급자는 Vertex AI `gemini-3.5-flash`(코칭), `gemini-3.8-flash-lite-tts`(예문 음성)이며 `COACH_MODEL`·`TTS_MODEL` 환경 변수로 변경할 수 있다. 기존 `GOOGLE_API_KEY` 서버 인증을 재사용하며 사용량은 과금될 수 있다.
 
-공식 형식은 [구조화 출력](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/capabilities/control-generated-output)과 [Gemini TTS](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/text-to-speech/overview)를 기준으로 한다.
+오디오는 소유권과 SHA-256을 확인한 비공개 녹음 바이트를 `audio/mp4` inlineData로 전달한다. 음성을 읽지 못하면 분석 실패로 남기며 전사만으로 자동 대체하지 않는다. 음성 품질이 부족하거나 전사가 불일치하면 관찰·교정을 보류한다. 지역별 예문 음성은 Extended Voice Library의 언어 코드를 확인해 선택하고, 요청한 지역 음성이 없으면 잘못된 억양을 대신 재생하지 않는다.
+
+공식 형식은 [오디오 이해](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/capabilities/audio-understanding), [구조화 출력](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/capabilities/control-generated-output)과 [Gemini TTS](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/text-to-speech/overview)를 기준으로 한다.
 
 ## 자동 검증
 
-`cd apps/api && .venv/bin/python -m pytest -q`에서 18개 테스트로 원본 입력, JSON 스키마·근거, 다른 사용자 차단, 캐시 중복 호출 방지, 실패 상태 보존, WAV 변환, 단기 URL, Storage 실패 시 삭제 중단을 검증한다.
+`cd apps/api && .venv/bin/python -m pytest -q`에서 23개 테스트로 원본 오디오 입력·체크섬, JSON 스키마·근거·구간 범위, 지역 음성 선택과 잘못된 억양 대체 차단, 다른 사용자 차단, 캐시 중복 호출 방지, 실패 상태 보존, WAV 변환, 단기 URL, Storage 실패 시 삭제 중단을 검증한다.
 
 `supabase/tests/s3_coaching.sql`은 실제 DB에서 예약 중복 방지·원본 보존·짧은 발화 거부·RLS·클라이언트 RPC 실행 차단·이력 삭제 후에도 유지되는 일일 사용량 제한을 검증하고 모두 롤백한다. 테스트 데이터를 유지하지 않는다.
 
-`evals/coaching_cases.json`은 실제 모델 결과를 사람이 비교할 대표 사례다. 자동 테스트 통과만으로 실제 코칭 품질을 승인하지 않는다. 원본 인용 일치, 의미 보존, 모드 적합성, 불필요한 교정, 민감한 추론·등급·음성 평가가 없는지 확인한다.
+`evals/coaching_cases.json`은 실제 모델 결과를 사람이 비교할 대표 사례다. 오디오 코칭을 실행할 때는 각 문장을 실제로 읽은 녹음도 준비해야 하며, 전사 텍스트만으로 음성 품질을 검증하지 않는다. 자동 테스트 통과만으로 실제 코칭 품질을 승인하지 않는다. 원본 인용 일치, 의미 보존, 모드 적합성, 불필요한 교정, 민감한 추론·등급·음성 평가가 없는지 확인한다.
 
 ## Android 실기기 확인
 
-1. 8단어 이상 녹음·전사 → 원본 발화 코칭 받기 → 피드백·인용 확인.
+1. 미국식·영국식을 선택하고 8단어 이상 녹음·전사 → 녹음 듣고 코칭 받기 → 내용·음성 피드백과 원본 구간 듣기 확인.
 2. 인식 오류 수정본을 저장한 뒤에도 분석에 사용한 원본이 유지되는지 확인.
 3. AI 예문 듣기·일시정지·재생 속도 변경. 음성 생성 실패해도 텍스트 예문이 보이는지 확인.
 4. 화면을 나갔다 돌아와서 같은 피드백을 확인. 다시 누를 때 중복 분석을 만들지 않는지 확인.
 5. 삭제 확인 창에서 취소·확인. 피드백만 삭제하면 원본 유지, 연습 기록 삭제 시 전체 이력 제거 확인.
 
-iOS는 구현만 유지하고 실기기 테스트는 Android 우선 검증 후 진행한다. 실제 공급자 코칭·TTS 품질과 Android 재생은 기기 확인 전까지 미검증이다.
+iOS는 구현만 유지하고 실기기 테스트는 Android 우선 검증 후 진행한다. 실제 공급자 오디오 코칭·미국식/영국식 TTS 품질과 Android 구간 재생은 기기 확인 전까지 미검증이다.
 
 ## 아이콘
 

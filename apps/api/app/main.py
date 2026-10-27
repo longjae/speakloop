@@ -6,6 +6,7 @@ import logging
 from datetime import datetime, timezone
 from uuid import uuid4
 from uuid import UUID
+from typing import Literal
 
 import httpx
 import jwt
@@ -69,7 +70,7 @@ async def query(table: str, token: str, method: str = "GET", *, params=None, bod
         response = await client.request(method, f"{url}/rest/v1/{table}", headers=headers, params=params, json=body)
     if response.status_code >= 400:
         messages = {404: '분석할 원본 전사를 찾을 수 없습니다.', 422: '분석할 내용이 짧습니다. 8단어 이상으로 다시 말해 주세요.', 429: '코칭 요청 한도에 도달했습니다. 잠시 후 다시 시도해 주세요.'}
-        detail = messages.get(response.status_code, '분석을 시작할 수 없습니다.') if table == 'rpc/reserve_coaching' else 'Data request failed'
+        detail = messages.get(response.status_code, '분석을 시작할 수 없습니다.') if table in {'rpc/reserve_coaching','rpc/reserve_audio_coaching'} else 'Data request failed'
         raise HTTPException(503 if response.status_code >= 500 else response.status_code, detail)
     return response.json() if response.content else None
 
@@ -100,7 +101,7 @@ def transcribe_audio(audio: bytes, mime_type: str) -> str:
     location = os.getenv("GOOGLE_CLOUD_LOCATION", "global")
     endpoint = f"https://aiplatform.googleapis.com/v1/projects/{project}/locations/{location}/publishers/google/models/{model}:generateContent"
     headers = {"x-goog-api-key": api_key}
-    payload = {"contents": [{"role": "user", "parts": [{"inlineData": {"mimeType": mime_type, "data": base64.b64encode(audio).decode("ascii")}}]}], "generationConfig": {"audioTranscriptionConfig": {"mode": "VERBATIM", "languageCodes": ["en-US"]}}}
+    payload = {"contents": [{"role": "user", "parts": [{"inlineData": {"mimeType": mime_type, "data": base64.b64encode(audio).decode("ascii")}}]}], "generationConfig": {"audioTranscriptionConfig": {"mode": "VERBATIM", "languageCodes": ["en-US", "en-GB"]}}}
     response = httpx.post(endpoint, headers=headers, json=payload, timeout=90)
     response.raise_for_status()
     content = response.json()
@@ -281,6 +282,7 @@ async def http_error(_, exc: HTTPException):
 
 class AnalysisRequest(BaseModel):
     utterance_id: UUID
+    accent: Literal['en-US','en-GB'] = 'en-US'
 
 
 class GuideRequest(BaseModel):
@@ -299,7 +301,7 @@ async def storage_request(method: str, bucket: str, path: str = '', **kwargs):
 
 
 def public_analysis(row: dict) -> dict:
-    return {k: row.get(k) for k in ('id','session_id','utterance_id','mode','status','feedback_json','input_source','input_text','rubric_version','audio_status','created_at','error_code')}
+    return {k: row.get(k) for k in ('id','session_id','utterance_id','mode','status','feedback_json','input_source','input_text','rubric_version','audio_status','created_at','error_code','accent','audio_duration_ms')}
 
 
 async def owned_analysis(analysis_id: UUID | str, user: tuple[str, str]):
@@ -315,6 +317,39 @@ def provider_failure(stage: str, exc: Exception):
     logger.error('Coaching failed: stage=%s error_type=%s provider_status=%s', stage, type(exc).__name__, status)
 
 
+async def analysis_recording(row: dict) -> dict:
+    key=service_key()
+    utterances=await query('utterances',key,params={'id':f"eq.{row['utterance_id']}",'session_id':f"eq.{row['session_id']}",'user_id':f"eq.{row['user_id']}",'select':'upload_id'})
+    if not utterances:
+        raise HTTPException(404,'원본 녹음을 찾을 수 없습니다.')
+    uploads=await query('audio_uploads',key,params={'id':f"eq.{utterances[0]['upload_id']}",'session_id':f"eq.{row['session_id']}",'user_id':f"eq.{row['user_id']}",'select':'path,size_bytes,duration_ms,checksum,mime_type'})
+    if not uploads or not uploads[0]['path'].startswith(f"{row['user_id']}/{row['session_id']}/"):
+        raise HTTPException(404,'원본 녹음을 찾을 수 없습니다.')
+    return uploads[0]
+
+
+async def load_coaching_audio(row: dict) -> bytes:
+    upload=await analysis_recording(row)
+    response=await storage_request('GET','recordings',f"object/recordings/{upload['path']}")
+    audio=response.content
+    checksum=hashlib.sha256(audio).hexdigest()
+    if (upload['mime_type']!='audio/mp4' or len(audio)!=upload['size_bytes'] or len(audio)>10_485_760
+        or not audio.startswith(b'\x00\x00') or b'ftyp' not in audio[:32]
+        or checksum!=upload['checksum'] or checksum!=row['audio_checksum']):
+        raise ValueError('Original recording checksum mismatch')
+    return audio
+
+
+@app.get('/v1/analyses/{analysis_id}/recording')
+async def get_analysis_recording(analysis_id: UUID,user: tuple[str,str]=Depends(current_user)):
+    row=await owned_analysis(analysis_id,user)
+    upload=await analysis_recording(row)
+    response=await storage_request('POST','recordings',f"object/sign/recordings/{upload['path']}",json={'expiresIn':300})
+    signed=response.json()['signedURL']
+    url=signed if signed.startswith('https://') else f'{settings()[0]}/storage/v1{signed}'
+    return {'playback_url':url,'expires_in':300,'duration_ms':upload['duration_ms']}
+
+
 async def run_analysis(row: dict):
     key = service_key()
     attempt = row['attempt_count']
@@ -327,7 +362,8 @@ async def run_analysis(row: dict):
         if sessions[0].get('scenario_id'):
             scenarios = await query('scenarios', key, params={'id': f"eq.{sessions[0]['scenario_id']}", 'select': 'prompt,goals'})
             scenario = scenarios[0] if scenarios else {}
-        feedback = await run_in_threadpool(generate_feedback, row['input_text'], row['mode'], scenario)
+        audio = await load_coaching_audio(row)
+        feedback = await run_in_threadpool(generate_feedback, row['input_text'], row['mode'], scenario, audio=audio, duration_ms=row['audio_duration_ms'], accent=row['accent'])
         updated = await query('analyses', key, 'PATCH', params=scope, body={'status':'ready','feedback_json': feedback,'error_code':None,'updated_at': datetime.now(timezone.utc).isoformat()})
         if updated:
             await query('practice_sessions', key, 'PATCH', params={'id':f"eq.{row['session_id']}"}, body={'status':'ready'})
@@ -341,7 +377,7 @@ async def create_analysis(session_id: UUID, payload: AnalysisRequest, user: tupl
     await owned_session(session_id, user)
     # Atomic reservation validates original transcript ownership, sample length,
     # duplicates, retry attempts and per-user daily provider calls in Postgres.
-    rows = await query('rpc/reserve_coaching', service_key(), 'POST', body={'p_user':user[0], 'p_session':str(session_id), 'p_utterance':str(payload.utterance_id), 'p_rubric':RUBRIC_VERSION, 'p_model':os.getenv('COACH_MODEL','gemini-3.5-flash')})
+    rows = await query('rpc/reserve_audio_coaching', service_key(), 'POST', body={'p_user':user[0], 'p_session':str(session_id), 'p_utterance':str(payload.utterance_id), 'p_rubric':f'{RUBRIC_VERSION}:{payload.accent}', 'p_model':os.getenv('COACH_MODEL','gemini-3.5-flash'), 'p_accent':payload.accent})
     row = rows[0]
     if row['status'] == 'processing':
         claimed = await query('analyses', service_key(), 'PATCH', params={'id':f"eq.{row['id']}",'status':'eq.processing','worker_started_at':'is.null'}, body={'worker_started_at':datetime.now(timezone.utc).isoformat()})
@@ -368,7 +404,7 @@ async def run_voice(row: dict):
     path = f"{row['user_id']}/{row['session_id']}/{row['id']}.wav"
     scope = {'id':f"eq.{row['id']}",'audio_attempts':f"eq.{row['audio_attempts']}",'audio_status':'eq.processing'}
     try:
-        audio = await run_in_threadpool(generate_voice,row['feedback_json']['improved_example'])
+        audio = await run_in_threadpool(generate_voice,row['feedback_json']['improved_example'],row.get('accent') if row.get('input_source')=='audio_original' else None)
         still_exists = await query('analyses',key,params={**scope,'select':'id'})
         if not still_exists:
             return

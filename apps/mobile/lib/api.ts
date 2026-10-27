@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { Accent } from './accent';
 
 const apiUrl = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
 
@@ -95,8 +96,13 @@ export function listUtterances(sessionId: string): Promise<{ items: Utterance[] 
   return request(`/v1/sessions/${sessionId}/utterances`);
 }
 
+export type AudioObservation = { category:'pronunciation'|'intonation'|'pace'|'pauses';start_ms:number;end_ms:number;observation:string;practice_tip:string;confidence:'low'|'medium'|'high' };
 export type Feedback = {
   summary: string;
+  audio_quality?: 'clear'|'limited'|'insufficient';
+  audio_quality_note?: string;
+  transcript_alignment?: 'consistent'|'uncertain'|'mismatch';
+  audio_observations?: AudioObservation[];
   strengths: { text: string; evidence: string }[];
   improvements: { category: string; original: string; corrected: string; reason: string }[];
   improved_example: string;
@@ -105,12 +111,12 @@ export type Feedback = {
 export type Analysis = {
   id: string; session_id: string; utterance_id: string; mode: PracticeSession['mode'];
   status: 'processing' | 'ready' | 'failed'; feedback_json: Feedback | null;
-  input_source: 'original'; input_text: string; rubric_version: string;
+  input_source: 'original'|'audio_original'; input_text: string; rubric_version: string; accent: Accent; audio_duration_ms: number | null;
   audio_status: 'none' | 'processing' | 'ready' | 'failed'; created_at: string;
 };
 export type AudioGuide = { id: string; status: Analysis['audio_status']; playback_url: string | null; expires_in: number };
-export function startAnalysis(sessionId: string, utteranceId: string): Promise<Analysis> {
-  return request(`/v1/sessions/${sessionId}/analysis`, { method: 'POST', body: JSON.stringify({ utterance_id: utteranceId }) });
+export function startAnalysis(sessionId: string, utteranceId: string, accent: Accent = 'en-US'): Promise<Analysis> {
+  return request(`/v1/sessions/${sessionId}/analysis`, { method: 'POST', body: JSON.stringify({ utterance_id: utteranceId, accent }) });
 }
 export function getAnalysis(id: string): Promise<Analysis> { return request(`/v1/analyses/${id}`); }
 export function listAnalyses(sessionId: string): Promise<{ items: Analysis[] }> { return request(`/v1/sessions/${sessionId}/analyses`); }
@@ -118,3 +124,5 @@ export function createAudioGuide(id: string): Promise<AudioGuide> { return reque
 export function getAudioGuide(id: string): Promise<AudioGuide> { return request(`/v1/audio-guides/${id}`); }
 export function deleteAnalysis(id: string): Promise<{ deleted: boolean }> { return request(`/v1/analyses/${id}`, { method: 'DELETE' }); }
 export function deleteSession(id: string): Promise<{ deleted: boolean }> { return request(`/v1/sessions/${id}`, { method: 'DELETE' }); }
+
+export function getAnalysisRecording(id:string):Promise<{playback_url:string;expires_in:number;duration_ms:number}> { return request(`/v1/analyses/${id}/recording`); }

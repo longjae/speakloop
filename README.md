@@ -24,7 +24,7 @@ S1 로그인·세션 기반 기능과 S2 시나리오 선택, 녹음·재생, �
 
 S2 전사는 Vercel 서버의 `SUPABASE_SERVICE_ROLE_KEY`와 `GOOGLE_API_KEY`를 사용합니다. `GOOGLE_CLOUD_PROJECT=speakloop-512602`, `GOOGLE_CLOUD_LOCATION=global`, `STT_MODEL=gemini-3.5-transcribe`도 설정했습니다. 키를 채팅이나 저장소에 넣지 않습니다. 녹음 제출은 사용량에 따라 과금될 수 있고, 사용자별 하루 예약 20회로 제한합니다.
 
-S3 코칭 코드와 DB 마이그레이션을 추가했습니다. 원본 전사 분석, 결과 화면, 예문 TTS, 분석 이력과 삭제를 제공합니다. [S3 검증 문서](docs/S3_ACCEPTANCE.md)의 Android 실기기 확인과 실제 공급자 품질 검토가 남았습니다.
+S3 코칭 코드와 DB 마이그레이션을 추가했습니다. 원본 오디오·전사 분석, 음성 특징의 구간 코칭, 미국식·영국식 선택, 결과 화면, 지역별 예문 TTS, 분석 이력과 삭제를 제공합니다. [S3 검증 문서](docs/S3_ACCEPTANCE.md)의 Android 실기기 확인과 실제 공급자 품질 검토가 남았습니다.
 
 ## 시작 순서
 
