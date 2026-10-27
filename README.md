@@ -50,3 +50,8 @@ S3 코칭 코드와 DB 마이그레이션을 추가했습니다. 원본 오디�
 [Supabase Android OAuth 안내](https://supabase.com/docs/guides/auth/native-mobile-deep-linking)와 [Expo OAuth 안내](https://docs.expo.dev/guides/authentication/)를 기준으로 설정합니다.
 
 > OPIc 예상 등급은 공식 성적이 아닌 연습용 추정치로 설계합니다.
+
+
+## 앱 탐색
+
+로그인 후 하단의 대시보드·오픽·일상 회화·설정 탭을 사용합니다. 설정에서 미국식/영국식 영어와 마이크 권한을 관리합니다. 마이크 권한은 연습 시작과 녹음 시작에도 확인하며, 거부되면 시스템 권한 팝업 또는 기기 설정으로 안내합니다. 이미 만든 분석은 당시의 영어 기준을 유지합니다.

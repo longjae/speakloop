@@ -1,0 +1,47 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, ScrollView, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import { Button, Text } from './ui';
+import { colors, ui } from '../lib/theme';
+import { createSession, listScenarios, PracticeSession, Scenario } from '../lib/api';
+import { ensureMicrophoneAccess } from '../lib/microphone';
+
+export function PracticeList({mode}:{mode:PracticeSession['mode']}) {
+  const [items,setItems]=useState<Scenario[]>([]);
+  const [loading,setLoading]=useState(true);
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState('');
+  const [permissionNeeded,setPermissionNeeded]=useState(false);
+  const requestVersion=useRef(0);
+  useFocusEffect(useCallback(()=>{setBusy(false);return ()=>{requestVersion.current++;};},[]));
+  useEffect(()=>{
+    let active=true;
+    setLoading(true);setError('');
+    listScenarios(mode).then(result=>{if(active)setItems(result.items);}).catch(cause=>{if(active)setError(cause.message);}).finally(()=>{if(active)setLoading(false);});
+    return ()=>{active=false;};
+  },[mode]);
+  async function start(scenario:Scenario) {
+    const version=requestVersion.current;
+    setBusy(true);setError('');setPermissionNeeded(false);
+    try {
+      if(!await ensureMicrophoneAccess()) {
+        setPermissionNeeded(true);setError('말하기 연습을 시작하려면 마이크 사용을 허용해 주세요.');return;
+      }
+      if(version!==requestVersion.current)return;
+      const session=await createSession(mode,scenario.id);
+      if(version!==requestVersion.current)return;
+      router.push({pathname:'/sessions/[id]',params:{id:session.id,scenarioId:scenario.id}});
+    } catch(cause) {if(version===requestVersion.current)setError(cause instanceof Error?cause.message:'연습을 시작할 수 없습니다.');}
+    finally {if(version===requestVersion.current)setBusy(false);}
+  }
+  return <ScrollView contentContainerStyle={ui.page}>
+    <Text style={ui.label}>{mode==='opic'?'OPIc PRACTICE':'EVERYDAY ENGLISH'}</Text>
+    <Text style={ui.title}>{mode==='opic'?'나의 이야기를 영어로.':'일상에서 바로 쓰는 영어.'}</Text>
+    <Text>{mode==='opic'?'질문을 고르고 나의 경험을 말해 보세요. 녹음 후 내용과 말하기 코칭을 받을 수 있습니다.':'상황에 맞게 말하고, 자연스러운 표현과 말하기 피드백을 확인하세요.'}</Text>
+    {loading&&<ActivityIndicator color={colors.mint}/>}
+    {error?<Text style={ui.error} accessibilityRole="alert">{error}</Text>:null}
+    {permissionNeeded&&<Button title="설정에서 마이크 권한 확인" onPress={()=>router.navigate('/settings')}/>}
+    {!loading&&!error&&items.length===0&&<Text>아직 준비된 시나리오가 없습니다.</Text>}
+    {items.map(item=><View style={ui.card} key={item.id}><Text style={ui.label}>{item.level==='beginner'?'초급':'중급'}</Text><Text style={ui.cardTitle}>{item.title}</Text><Text>{item.prompt}</Text><Text>목표 · {item.goals.join(' · ')}</Text><Button variant="primary" title="이 주제로 연습하기" disabled={busy} onPress={()=>start(item)}/></View>)}
+  </ScrollView>;
+}

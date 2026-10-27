@@ -1,16 +1,16 @@
 import { Button, Text, TextInput } from '../../components/ui';
-import { AccentSelector } from '../../components/AccentSelector';
-import { Accent, accentLabels, loadAccent, saveAccent } from '../../lib/accent';
+import { Accent, accentLabels, loadAccent } from '../../lib/accent';
 import { colors, ui } from '../../lib/theme';
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet } from 'react-native';
-import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioPlayer, useAudioRecorder, useAudioRecorderState } from 'expo-audio';
+import { RecordingPresets, setAudioModeAsync, useAudioPlayer, useAudioRecorder, useAudioRecorderState } from 'expo-audio';
 import { File } from 'expo-file-system';
 import { randomUUID } from 'expo-crypto';
 import { editTranscript, getScenario, getSession, listUtterances, PracticeSession, reserveUpload, Scenario, transcribeUpload, Utterance } from '../../lib/api';
 import { supabase } from '../../lib/supabase';
 import { Analysis, deleteSession, listAnalyses, startAnalysis } from '../../lib/api';
+import { ensureMicrophoneAccess } from '../../lib/microphone';
 
 export default function SessionDetail() {
   const { id, scenarioId } = useLocalSearchParams<{ id: string; scenarioId?: string }>();
@@ -27,10 +27,13 @@ export default function SessionDetail() {
   const [uploadMessage, setUploadMessage] = useState('');
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
-  const [accent,setAccent] = useState<Accent>('en-US');
+  const [accent,setAccent] = useState<Accent|null>(null);
   const [accentLoading,setAccentLoading] = useState(true);
-  useEffect(()=>{ let active=true;loadAccent().then(value=>{if(active)setAccent(value);}).catch(()=>{}).finally(()=>{if(active)setAccentLoading(false);});return ()=>{active=false;}; },[]);
-  function changeAccent(value:Accent) { setAccent(value);void saveAccent(value).catch(()=>setError('이 기기에 선택을 저장하지 못했습니다. 이번 연습에는 선택한 영어를 사용합니다.')); }
+  useFocusEffect(useCallback(()=>{
+    let active=true;setAccentLoading(true);
+    loadAccent().then(value=>{if(active)setAccent(value);}).catch(()=>{if(active){setAccent(null);setError('영어 설정을 불러오지 못했습니다. 설정 탭에서 다시 선택해 주세요.');}}).finally(()=>{if(active)setAccentLoading(false);});
+    return ()=>{active=false;};
+  },[]));
 
   const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, directory: 'document' });
   const recorderState = useAudioRecorderState(recorder);
@@ -61,7 +64,7 @@ export default function SessionDetail() {
   }, [id]));
 
   async function analyze() {
-    if (!id || !utterance) return;
+    if (!id || !utterance || !accent) return;
     setAnalyzing(true); setError('');
     try {
       const result = await startAnalysis(id, utterance.id, accent);
@@ -73,7 +76,7 @@ export default function SessionDetail() {
   function removeSession() {
     Alert.alert('연습 기록을 삭제할까요?', '녹음, 전사, 피드백과 AI 음성이 함께 삭제됩니다.', [
       { text: '취소', style: 'cancel' },
-      { text: '삭제', style: 'destructive', onPress: () => { setBusy(true); deleteSession(id).then(() => router.replace('/')).catch(cause => setError(cause.message)).finally(() => setBusy(false)); } },
+      { text: '삭제', style: 'destructive', onPress: () => { setBusy(true); deleteSession(id).then(() => router.replace('/dashboard')).catch(cause => setError(cause.message)).finally(() => setBusy(false)); } },
     ]);
   }
 
@@ -81,8 +84,7 @@ export default function SessionDetail() {
     setBusy(true);
     setError('');
     try {
-      const permission = await AudioModule.requestRecordingPermissionsAsync();
-      if (!permission.granted) throw new Error('마이크 권한이 필요합니다. 기기 설정에서 허용해 주세요.');
+      if (!await ensureMicrophoneAccess()) { setError('마이크 사용을 허용한 뒤 녹음을 다시 시작해 주세요. 설정 탭에서도 확인할 수 있습니다.'); return; }
       await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
       setRecordingUri(null);
       setUploadedId(null);
@@ -178,7 +180,7 @@ export default function SessionDetail() {
     {error && <Text style={ui.error} accessibilityRole="alert">{error}</Text>}
     {session && <>
       <Text style={styles.title}>{scenario?.title ?? (session.mode === 'opic' ? 'OPIc 연습' : '일상 회화')}</Text>
-      <AccentSelector value={accent} onChange={changeAccent} disabled={accentLoading || analyzing || busy || recorderState.isRecording} />
+      <Text>연습 기준 · {accentLoading?'설정 확인 중':accent?accentLabels[accent]:'설정 확인 필요'}</Text>
       {scenario && <><Text style={styles.prompt}>{scenario.prompt}</Text><Text>목표: {scenario.goals.join(' · ')}</Text></>}
       {Platform.OS === 'web' ? <Text>녹음은 Android·iOS 앱에서 이용해 주세요.</Text> : <>
         <Text>녹음은 먼저 기기에 저장됩니다. 제출하면 비공개 저장소에 보관하고, 영어 전사와 말하기 코칭을 위해 Google Vertex AI로 보냅니다.</Text>
@@ -188,7 +190,7 @@ export default function SessionDetail() {
         {uploadMessage && <Text style={styles.notice} accessibilityLiveRegion="polite">{uploadMessage}</Text>}
         {utterance && <><Text style={ui.label}>TRANSCRIPT · 나의 발화</Text><Text style={ui.subtitle}>원본: {utterance.transcript_raw || '인식한 말이 없습니다. 다시 녹음해 주세요.'}</Text><Text style={ui.label}>인식 오류 수정</Text><TextInput accessibilityLabel="전사 수정" multiline value={editedText} onChangeText={value => { setEditedText(value); setSaveMessage(''); }} style={styles.editor} /><Button variant="primary" title="수정한 전사 저장" disabled={busy || analyzing || !editedText.trim()} onPress={saveTranscript} />{saveMessage && <Text style={styles.notice} accessibilityLiveRegion="polite">{saveMessage}</Text>}{utterance.transcript_edited && <Text>저장된 수정본: {utterance.transcript_edited}</Text>}</>}
       </>}
-      {utterance?.stt_status === 'ready' && <><Text>코칭에는 녹음한 원본 오디오와 원본 전사를 함께 사용합니다. 수정한 문장은 평가에 반영하지 않습니다.</Text><Button variant="primary" title="녹음 듣고 코칭 받기" loading={analyzing} disabled={busy || accentLoading || recorderState.isRecording} onPress={analyze} /></>}
+      {utterance?.stt_status === 'ready' && <><Text>코칭에는 녹음한 원본 오디오와 원본 전사를 함께 사용합니다. 수정한 문장은 평가에 반영하지 않습니다.</Text><Button variant="primary" title="녹음 듣고 코칭 받기" loading={analyzing} disabled={busy || accentLoading || !accent || recorderState.isRecording} onPress={analyze} /></>}
       {analyses.length > 0 && <><Text style={ui.cardTitle}>피드백 이력</Text>{analyses.map(item => <Button key={item.id} title={`${new Date(item.created_at).toLocaleDateString('ko-KR')} · ${item.input_source==='audio_original'?accentLabels[item.accent ?? 'en-US']:'전사 코칭'} · ${item.status === 'ready' ? '피드백 보기' : item.status === 'failed' ? '분석 재시도' : '분석 중'}`} onPress={() => router.push({ pathname: '/analyses/[id]', params: { id: item.id } })} />)}</>}
       <Button variant="quiet" title="이 연습 기록 삭제" disabled={busy || analyzing || recorderState.isRecording} onPress={removeSession} />
     </>}
