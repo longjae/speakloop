@@ -207,37 +207,27 @@ def test_original_recording_checksum_is_verified(monkeypatch):
     assert seen.count('utterances')==2
 
 
-def test_regional_voice_selection_and_spoken_text_separation(monkeypatch):
-    monkeypatch.setenv('GOOGLE_CLOUD_PROJECT','test-project')
-    monkeypatch.setenv('GOOGLE_API_KEY','test-key')
+@pytest.mark.parametrize('accent,region',[('en-US','American'),('en-GB','British')])
+def test_regional_voice_without_oauth_library_dependency(monkeypatch,accent,region):
     monkeypatch.delenv('TTS_VOICE_EN_US',raising=False)
     monkeypatch.delenv('TTS_VOICE_EN_GB',raising=False)
-    coaching._library_voice.cache_clear()
-    def get(url,**kwargs):
-        return SimpleNamespace(raise_for_status=lambda:None,json=lambda:{'voices':[{'id':'voice_american','languageCode':'en-US'},{'id':'voice_british','languageCode':'en-GB'}]})
-    monkeypatch.setattr(coaching.httpx,'get',get)
-    assert coaching.resolve_voice('en-US')=='voice_american'
-    assert coaching.resolve_voice('en-GB')=='voice_british'
+    monkeypatch.setattr(coaching.httpx,'get',lambda *args,**kwargs:pytest.fail('API-key TTS must not call OAuth-only Voices.list'))
     seen={}
     def generate(model,payload):
         seen.update(payload)
         return {'candidates':[{'content':{'parts':[{'inlineData':{'data':base64.b64encode(b'\x00\x01'*240).decode(),'mimeType':'audio/L16'}}]}}]}
     monkeypatch.setattr(coaching,'vertex_generate',generate)
-    coaching.generate_voice('A coffee, please.','en-GB')
+    audio=coaching.generate_voice('A coffee, please.',accent)
+    assert audio.startswith(b'RIFF')
     assert seen['contents'][0]['parts'][0]['text']=='A coffee, please.'
-    assert 'British' in seen['contents'][0]['parts'][0]['speechMetadata']['style']
-    assert seen['generationConfig']['speechConfig']['voiceConfig']['voice']=='voice_british'
-    coaching._library_voice.cache_clear()
+    assert region in seen['contents'][0]['parts'][0]['speechMetadata']['style']
+    assert seen['generationConfig']['speechConfig']['voiceConfig']['voice']=='Kore'
 
 
-def test_unavailable_accent_voice_never_silently_falls_back(monkeypatch):
-    monkeypatch.setenv('GOOGLE_CLOUD_PROJECT','test-project')
-    monkeypatch.setenv('GOOGLE_API_KEY','test-key')
-    monkeypatch.delenv('TTS_VOICE_EN_GB',raising=False)
-    coaching._library_voice.cache_clear()
-    monkeypatch.setattr(coaching.httpx,'get',lambda *args,**kwargs:SimpleNamespace(raise_for_status=lambda:None,json=lambda:{'voices':[{'id':'Kore','languageCode':'en-US'}]}))
-    with pytest.raises(RuntimeError):coaching.resolve_voice('en-GB')
-    coaching._library_voice.cache_clear()
+def test_regional_voice_override_and_invalid_accent(monkeypatch):
+    monkeypatch.setenv('TTS_VOICE_EN_GB','voice_british')
+    assert coaching.resolve_voice('en-GB')=='voice_british'
+    with pytest.raises(ValueError):coaching.resolve_voice('ko-KR')
 
 
 def test_invalid_accent_is_rejected_before_database(monkeypatch):

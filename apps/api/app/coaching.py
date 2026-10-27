@@ -6,7 +6,6 @@ import os
 import re
 import wave
 from typing import Literal
-from functools import lru_cache
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
@@ -119,28 +118,14 @@ Give 0-3 strengths, 0-3 priority content improvements, and 0-4 audio_observation
     return validate_feedback(json.loads(text), transcript, duration_ms).model_dump()
 
 
-@lru_cache(maxsize=8)
-def _library_voice(accent: str, project: str) -> str:
-    response = httpx.get(f'https://aiplatform.googleapis.com/v1beta1/projects/{project}/locations/global/voices',
-        headers={'x-goog-api-key':os.environ['GOOGLE_API_KEY']},
-        params={'type':'prebuilt','search':'British' if accent=='en-GB' else 'American','pageSize':50}, timeout=20)
-    response.raise_for_status()
-    for voice in response.json().get('voices',[]):
-        language = voice.get('languageCode',voice.get('language_code','')).lower()
-        regional = str(voice.get('accent','')).lower()
-        matches = language == accent.lower() or (language=='en' and ('british' if accent=='en-GB' else 'american') in regional)
-        voice_id = voice.get('id','')
-        if matches and re.fullmatch(r'[A-Za-z0-9_.-]{1,200}',voice_id):
-            return voice_id
-    # Never silently serve a different accent under a British/American label.
-    raise RuntimeError('Requested regional voice is unavailable')
-
-
 def resolve_voice(accent: str) -> str:
     if accent not in ('en-US','en-GB'):
         raise ValueError('Unsupported accent')
-    configured=os.getenv('TTS_VOICE_EN_GB' if accent=='en-GB' else 'TTS_VOICE_EN_US','')
-    return configured or _library_voice(accent,os.environ['GOOGLE_CLOUD_PROJECT'])
+    # Voices.list requires OAuth credentials and rejects our server API key.
+    # Prebuilt voices work directly with generateContent; speechMetadata selects
+    # the requested accent without a second authentication dependency.
+    configured = os.getenv('TTS_VOICE_EN_GB' if accent=='en-GB' else 'TTS_VOICE_EN_US','')
+    return configured or 'Kore'
 
 
 def generate_voice(text: str, accent: str | None = None) -> bytes:

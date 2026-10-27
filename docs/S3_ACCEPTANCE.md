@@ -12,13 +12,13 @@
 
 기본 공급자는 Vertex AI `gemini-3.5-flash`(코칭), `gemini-3.8-flash-lite-tts`(예문 음성)이며 `COACH_MODEL`·`TTS_MODEL` 환경 변수로 변경할 수 있다. 기존 `GOOGLE_API_KEY` 서버 인증을 재사용하며 사용량은 과금될 수 있다.
 
-오디오는 소유권과 SHA-256을 확인한 비공개 녹음 바이트를 `audio/mp4` inlineData로 전달한다. 음성을 읽지 못하면 분석 실패로 남기며 전사만으로 자동 대체하지 않는다. 음성 품질이 부족하거나 전사가 불일치하면 관찰·교정을 보류한다. 지역별 예문 음성은 Extended Voice Library의 언어 코드를 확인해 선택하고, 요청한 지역 음성이 없으면 잘못된 억양을 대신 재생하지 않는다.
+오디오는 소유권과 SHA-256을 확인한 비공개 녹음 바이트를 `audio/mp4` inlineData로 전달한다. 음성을 읽지 못하면 분석 실패로 남기며 전사만으로 자동 대체하지 않는다. 음성 품질이 부족하거나 전사가 불일치하면 관찰·교정을 보류한다. 예문 음성은 기본 음색 Kore에 `speechMetadata.style`로 미국식·영국식 발화를 요청한다. API 키 인증으로 401을 반환하는 Voices 목록 조회는 사용하지 않는다. 실제 억양 일치와 음성 품질은 실청취로 확인해야 한다. 지역별 검증 음색을 확보하면 `TTS_VOICE_EN_US`·`TTS_VOICE_EN_GB`로 지정할 수 있다.
 
 공식 형식은 [오디오 이해](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/capabilities/audio-understanding), [구조화 출력](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/capabilities/control-generated-output)과 [Gemini TTS](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/text-to-speech/overview)를 기준으로 한다.
 
 ## 자동 검증
 
-`cd apps/api && .venv/bin/python -m pytest -q`에서 23개 테스트로 원본 오디오 입력·체크섬, JSON 스키마·근거·구간 범위, 지역 음성 선택과 잘못된 억양 대체 차단, 다른 사용자 차단, 캐시 중복 호출 방지, 실패 상태 보존, WAV 변환, 단기 URL, Storage 실패 시 삭제 중단을 검증한다.
+`cd apps/api && .venv/bin/python -m pytest -q`에서 24개 테스트로 원본 오디오 입력·체크섬, JSON 스키마·근거·구간 범위, 음성 목록 조회 없이 지역별 발화 지시·원문 분리, 다른 사용자 차단, 캐시 중복 호출 방지, 실패 상태 보존, WAV 변환, 단기 URL, Storage 실패 시 삭제 중단을 검증한다.
 
 `supabase/tests/s3_coaching.sql`은 실제 DB에서 예약 중복 방지·원본 보존·짧은 발화 거부·RLS·클라이언트 RPC 실행 차단·이력 삭제 후에도 유지되는 일일 사용량 제한을 검증하고 모두 롤백한다. 테스트 데이터를 유지하지 않는다.
 
@@ -50,3 +50,9 @@ iOS는 구현만 유지하고 실기기 테스트는 Android 우선 검증 후 �
 - 허용된 마이크를 OS에서 취소한 뒤 기존 세션에서 녹음 시작 시 다시 권한 절차 안내.
 
 탭 이동·권한 거부·기기 설정 복귀와 OAuth는 Android 실기기 확인이 필요하다. 타입 검사와 Android 내보내기로 전체 라우트가 컴파일되는지 확인한다.
+
+## 재생 오류 수정 검증
+
+- Android 원본 재생은 최초 로딩 후 한 번만 탐색한다. 탐색 중 `isLoaded`가 바뀌어도 재생을 취소하거나 다시 탐색하지 않는다. 전체 원본은 불필요한 0초 탐색을 생략한다.
+- 원본 로딩·재생·일시정지·실패를 표시하고, 20초 로딩 지연을 안내한다. AI 음성도 최초 한 번만 자동 재생하며 네이티브 재생 오류를 표시한다.
+- 수정 후 API 테스트 24개, 모바일 타입 검사, Android 번들 생성 통과. 운영 배포와 실제 TTS 호출은 승인 대기이며 기기 재생은 아직 미검증.

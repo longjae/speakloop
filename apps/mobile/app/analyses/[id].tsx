@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, ScrollView, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { Button, Text } from '../../components/ui';
 import { RecordingPlayback } from '../../components/RecordingPlayback';
 import { accentLabels } from '../../lib/accent';
@@ -25,7 +25,7 @@ export default function AnalysisDetail() {
   const [clip,setClip]=useState<{url:string;startMs:number;endMs:number|null;key:number}|null>(null);
   const clipSequence=useRef(0);
   async function listenOriginal(startMs=0,endMs:number|null=null) {
-    setOriginalBusy(true);setError('');player.pause();
+    setOriginalBusy(true);setError('');player.pause();setGuideUrl(null);
     try {
       const result=await getAnalysisRecording(id);
       if(mounted.current)setClip({url:result.playback_url,startMs,endMs,key:++clipSequence.current});
@@ -37,6 +37,7 @@ export default function AnalysisDetail() {
   useEffect(()=>{ mounted.current=true;return ()=>{mounted.current=false;}; },[]);
   const player=useAudioPlayer(null);
   const playback=useAudioPlayerStatus(player);
+  const guideStarted=useRef(false);
 
   useEffect(()=>{
     let disposed=false;
@@ -61,12 +62,17 @@ export default function AnalysisDetail() {
 
   useEffect(()=>{
     if (!guideUrl) return;
+    guideStarted.current=false;
     player.replace({ uri:guideUrl });
   },[guideUrl,player]);
   useEffect(()=>{
-    if (playback.isLoaded && guideUrl) player.play();
+    if (!playback.isLoaded || !guideUrl || guideStarted.current) return;
+    guideStarted.current=true;
+    void setAudioModeAsync({playsInSilentMode:true,allowsRecording:false}).then(()=>{if(mounted.current)player.play();}).catch(()=>setVoiceMessage('음성을 재생하지 못했습니다. 다시 눌러 주세요.'));
   },[playback.isLoaded,guideUrl,player]);
   useEffect(()=>{ if(playback.isLoaded) player.setPlaybackRate(speed); },[playback.isLoaded,speed,player]);
+
+  useEffect(()=>{if(playback.error)setVoiceMessage('AI 음성을 불러오지 못했습니다. 듣기를 다시 눌러 주세요.');},[playback.error]);
 
   async function retry() {
     if (!analysis) return;
