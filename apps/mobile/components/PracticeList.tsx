@@ -38,6 +38,7 @@ export function PracticeList({mode}:{mode:PracticeSession['mode']}) {
     <Text style={ui.label}>{mode==='opic'?'OPIc PRACTICE':'EVERYDAY ENGLISH'}</Text>
     <Text style={ui.title}>{mode==='opic'?'나의 이야기를 영어로.':'일상에서 바로 쓰는 영어.'}</Text>
     <Text>{mode==='opic'?'질문을 고르고 나의 경험을 말해 보세요. 녹음 후 내용과 말하기 코칭을 받을 수 있습니다.':'상황에 맞게 말하고, 자연스러운 표현과 말하기 피드백을 확인하세요.'}</Text>
+    {mode==='opic'?<View style={ui.card}><Text style={ui.label}>OPIc PLAYBOOK</Text><Text style={ui.cardTitle}>내 이야기를 잘 전달하는 6가지 방법</Text><Text>질문 파악부터 경험 연결, 다시 말하기까지 한 장씩 확인하세요.</Text><Button title="OPIc 노하우 보기" onPress={()=>router.push('/opic/guide')}/></View>:null}
     {loading&&<ActivityIndicator color={colors.mint}/>}
     {error?<Text style={ui.error} accessibilityRole="alert">{error}</Text>:null}
     {permissionNeeded&&<Button title="설정에서 마이크 권한 확인" onPress={()=>router.navigate('/settings')}/>}

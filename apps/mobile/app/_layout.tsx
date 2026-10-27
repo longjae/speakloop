@@ -15,6 +15,10 @@ function Navigation() {
       <Stack.Screen name="scenarios/[mode]"/>
       <Stack.Screen name="sessions/[id]"/>
       <Stack.Screen name="analyses/[id]"/>
+      <Stack.Screen name="feedback/[id]/[step]" options={{animation:'slide_from_right'}}/>
+      <Stack.Screen name="sessions/[id]/review"/>
+      <Stack.Screen name="sessions/[id]/coaching"/>
+      <Stack.Screen name="opic/guide"/>
     </Stack.Protected>
     <Stack.Screen name="reset-password"/>
   </Stack>;
