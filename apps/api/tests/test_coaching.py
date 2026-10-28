@@ -313,3 +313,27 @@ def test_sentence_synthesis_uses_selected_text_and_persists_state(monkeypatch,pr
     assert result.status_code==200
     assert result.json()['status']==('failed' if provider_fails else 'ready')
     assert bool(result.json()['playback_url']) is not provider_fails
+
+
+
+def test_question_audio_cache_uses_active_scenario_and_server_prompt(monkeypatch):
+    async def get_scenario(*args):return {'id':ANALYSIS,'version':2,'prompt':'Describe your home.'}
+    async def query(table,token,method='GET',**kwargs):
+        assert table=='rpc/reserve_question_audio'
+        assert kwargs['body']=={'p_scenario':ANALYSIS,'p_version':2,'p_accent':'en-GB'}
+        return [{'status':'ready','attempts':1,'audio_path':'_questions/test.wav'}]
+    async def storage(*args,**kwargs):return SimpleNamespace(json=lambda:{'signedURL':'https://example.invalid/question'})
+    monkeypatch.setattr(main,'get_scenario',get_scenario)
+    monkeypatch.setattr(main,'query',query)
+    monkeypatch.setattr(main,'storage_request',storage)
+    monkeypatch.setattr(main,'generate_voice',lambda *args:pytest.fail('cached question regenerated'))
+    result=TestClient(main.app).post(f'/v1/scenarios/{ANALYSIS}/audio',json={'accent':'en-GB'})
+    assert result.status_code==200 and result.json()['status']=='ready'
+
+
+def test_question_audio_rejects_unavailable_scenario_and_invalid_accent(monkeypatch):
+    async def missing(*args):raise HTTPException(404,'missing')
+    monkeypatch.setattr(main,'get_scenario',missing)
+    monkeypatch.setattr(main,'generate_voice',lambda *args:pytest.fail('unavailable prompt synthesized'))
+    assert TestClient(main.app).post(f'/v1/scenarios/{ANALYSIS}/audio',json={'accent':'en-US'}).status_code==404
+    assert TestClient(main.app).post(f'/v1/scenarios/{ANALYSIS}/audio',json={'accent':'xx'}).status_code==422

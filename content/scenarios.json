@@ -1,0 +1,566 @@
+[
+  {
+    "id": "d24b1e46-7f44-4677-bd03-1a9cc6a609d1",
+    "mode": "opic",
+    "topic": "self",
+    "question_type": "introduction",
+    "title": "자기소개",
+    "prompt": "Please introduce yourself. Tell me about your interests and your everyday life.",
+    "goals": [
+      "자기소개",
+      "관심사와 일상 설명"
+    ],
+    "level": "beginner"
+  },
+  {
+    "id": "8a0ebba3-5303-5dc9-a68d-d1303445bc9a",
+    "mode": "opic",
+    "topic": "home",
+    "question_type": "description",
+    "title": "집 · 묘사",
+    "prompt": "Describe your home. What is your favorite room, and why do you like it?",
+    "goals": [
+      "질문 수행",
+      "구체적 내용",
+      "문장 연결"
+    ],
+    "level": "beginner"
+  },
+  {
+    "id": "7d786578-2347-5487-aff2-10f7c491e33e",
+    "mode": "opic",
+    "topic": "home",
+    "question_type": "routine",
+    "title": "집 · 일상 습관",
+    "prompt": "What do you usually do at home on weekdays? Walk me through your routine.",
+    "goals": [
+      "질문 수행",
+      "구체적 내용",
+      "문장 연결"
+    ],
+    "level": "beginner"
+  },
+  {
+    "id": "3becccbe-07c0-5c3a-959a-d49919b96c52",
+    "mode": "opic",
+    "topic": "home",
+    "question_type": "past",
+    "title": "집 · 과거 경험",
+    "prompt": "Tell me about a memorable event that happened at home. What happened, and how did you feel?",
+    "goals": [
+      "질문 수행",
+      "구체적 내용",
+      "문장 연결"
+    ],
+    "level": "intermediate"
+  },
+  {
+    "id": "2f3d0ce1-cfd9-5728-b62c-ff2036ae1c8d",
+    "mode": "opic",
+    "topic": "travel",
+    "question_type": "description",
+    "title": "여행 · 묘사",
+    "prompt": "Describe a place you like to visit on vacation. What makes it special?",
+    "goals": [
+      "질문 수행",
+      "구체적 내용",
+      "문장 연결"
+    ],
+    "level": "beginner"
+  },
+  {
+    "id": "86b944c5-37b7-5b14-a339-34c404a2c8df",
+    "mode": "opic",
+    "topic": "travel",
+    "question_type": "routine",
+    "title": "여행 · 일상 습관",
+    "prompt": "How do you usually prepare for a trip? Explain what you do before leaving.",
+    "goals": [
+      "질문 수행",
+      "구체적 내용",
+      "문장 연결"
+    ],
+    "level": "beginner"
+  },
+  {
+    "id": "be4d3ee0-fce7-4f0b-893e-a7605962d77a",
+    "mode": "opic",
+    "topic": "travel",
+    "question_type": "past",
+    "title": "여행 · 과거 경험",
+    "prompt": "Tell me about a memorable trip. Where did you go, and what happened?",
+    "goals": [
+      "질문 수행",
+      "구체적 내용",
+      "문장 연결"
+    ],
+    "level": "intermediate"
+  },
+  {
+    "id": "02f1c90c-cf8f-5b93-8fe2-797eb74c29df",
+    "mode": "opic",
+    "topic": "park",
+    "question_type": "description",
+    "title": "공원 · 묘사",
+    "prompt": "Describe a park you enjoy visiting. What does it look like?",
+    "goals": [
+      "질문 수행",
+      "구체적 내용",
+      "문장 연결"
+    ],
+    "level": "beginner"
+  },
+  {
+    "id": "c51ff5f8-4abe-577d-8ef8-ab92972684c8",
+    "mode": "opic",
+    "topic": "park",
+    "question_type": "routine",
+    "title": "공원 · 일상 습관",
+    "prompt": "When do you usually visit a park, and what do you do there?",
+    "goals": [
+      "질문 수행",
+      "구체적 내용",
+      "문장 연결"
+    ],
+    "level": "beginner"
+  },
+  {
+    "id": "fa3244cb-b93a-598a-be0a-bea16e3453c9",
+    "mode": "opic",
+    "topic": "park",
+    "question_type": "past",
+    "title": "공원 · 과거 경험",
+    "prompt": "Tell me about something unexpected that happened during a visit to a park.",
+    "goals": [
+      "질문 수행",
+      "구체적 내용",
+      "문장 연결"
+    ],
+    "level": "intermediate"
+  },
+  {
+    "id": "76b7b3b8-7540-52a9-accf-811e900b8f7f",
+    "mode": "opic",
+    "topic": "music",
+    "question_type": "description",
+    "title": "음악 · 묘사",
+    "prompt": "What kind of music do you enjoy? Describe an artist or a song you like.",
+    "goals": [
+      "질문 수행",
+      "구체적 내용",
+      "문장 연결"
+    ],
+    "level": "beginner"
+  },
+  {
+    "id": "e12f2fd2-b270-50cd-814c-af279b4d4671",
+    "mode": "opic",
+    "topic": "music",
+    "question_type": "routine",
+    "title": "음악 · 일상 습관",
+    "prompt": "When and where do you usually listen to music? Tell me about your habits.",
+    "goals": [
+      "질문 수행",
+      "구체적 내용",
+      "문장 연결"
+    ],
+    "level": "beginner"
+  },
+  {
+    "id": "682a7606-756b-508d-b894-4131922ea66a",
+    "mode": "opic",
+    "topic": "music",
+    "question_type": "past",
+    "title": "음악 · 과거 경험",
+    "prompt": "Tell me about a concert or music event you remember. What made it memorable?",
+    "goals": [
+      "질문 수행",
+      "구체적 내용",
+      "문장 연결"
+    ],
+    "level": "intermediate"
+  },
+  {
+    "id": "92295412-d4f3-504e-8bd7-8d442c0675cd",
+    "mode": "opic",
+    "topic": "exercise",
+    "question_type": "description",
+    "title": "운동 · 묘사",
+    "prompt": "Describe an exercise you enjoy. What equipment or place do you need?",
+    "goals": [
+      "질문 수행",
+      "구체적 내용",
+      "문장 연결"
+    ],
+    "level": "beginner"
+  },
+  {
+    "id": "577f417c-5a89-549d-9b06-be50d1540a0f",
+    "mode": "opic",
+    "topic": "exercise",
+    "question_type": "routine",
+    "title": "운동 · 일상 습관",
+    "prompt": "Tell me about your exercise routine. How do you fit it into your week?",
+    "goals": [
+      "질문 수행",
+      "구체적 내용",
+      "문장 연결"
+    ],
+    "level": "beginner"
+  },
+  {
+    "id": "4e5fe2ac-daaf-5939-8a02-6cba41d61f6c",
+    "mode": "opic",
+    "topic": "exercise",
+    "question_type": "past",
+    "title": "운동 · 과거 경험",
+    "prompt": "Tell me about a challenge you faced while exercising. How did you handle it?",
+    "goals": [
+      "질문 수행",
+      "구체적 내용",
+      "문장 연결"
+    ],
+    "level": "intermediate"
+  },
+  {
+    "id": "65dac460-6444-5986-af19-bfd780043862",
+    "mode": "opic",
+    "topic": "technology",
+    "question_type": "description",
+    "title": "기술 · 묘사",
+    "prompt": "Describe a device you use often. What do you use it for?",
+    "goals": [
+      "질문 수행",
+      "구체적 내용",
+      "문장 연결"
+    ],
+    "level": "beginner"
+  },
+  {
+    "id": "8f4244fb-ce21-563a-a9fe-937fa5af7e78",
+    "mode": "opic",
+    "topic": "technology",
+    "question_type": "routine",
+    "title": "기술 · 일상 습관",
+    "prompt": "How do you use technology in your daily life? Explain a typical day.",
+    "goals": [
+      "질문 수행",
+      "구체적 내용",
+      "문장 연결"
+    ],
+    "level": "beginner"
+  },
+  {
+    "id": "4b9b1855-1b26-5974-8b21-58dfa23550d0",
+    "mode": "opic",
+    "topic": "technology",
+    "question_type": "past",
+    "title": "기술 · 과거 경험",
+    "prompt": "Tell me about a time a device stopped working. What did you do to solve the problem?",
+    "goals": [
+      "질문 수행",
+      "구체적 내용",
+      "문장 연결"
+    ],
+    "level": "intermediate"
+  },
+  {
+    "id": "3a337665-af7c-5a4e-8636-828bfd5dc4a1",
+    "mode": "opic",
+    "topic": "booking",
+    "question_type": "roleplay_question",
+    "title": "호텔 예약 · 질문하기",
+    "prompt": "You want to book a hotel room. Call the hotel and ask three or four questions about the room and the services.",
+    "goals": [
+      "정보 질문",
+      "상황에 맞는 표현"
+    ],
+    "level": "intermediate"
+  },
+  {
+    "id": "10c282f1-842b-500f-8910-dc4d206117d4",
+    "mode": "opic",
+    "topic": "booking",
+    "question_type": "roleplay_solution",
+    "title": "호텔 예약 · 문제 해결",
+    "prompt": "You arrive at a hotel, but the room you reserved is not available. Explain the problem and suggest two possible solutions.",
+    "goals": [
+      "문제 설명",
+      "대안 제안"
+    ],
+    "level": "intermediate"
+  },
+  {
+    "id": "e32794a4-ce39-5d86-8855-a7c2ada416d8",
+    "mode": "opic",
+    "topic": "booking",
+    "question_type": "roleplay_experience",
+    "title": "호텔 예약 · 비슷한 경험",
+    "prompt": "Have you ever had a problem with a reservation? Describe what happened and how you resolved it. If not, describe a similar problem.",
+    "goals": [
+      "경험 설명",
+      "해결 과정"
+    ],
+    "level": "intermediate"
+  },
+  {
+    "id": "8e73fd96-f078-537d-a271-280da353bbcf",
+    "mode": "opic",
+    "topic": "home",
+    "question_type": "comparison",
+    "title": "집 · 과거와 현재 비교",
+    "prompt": "Compare the home you lived in as a child with your home now. What has changed?",
+    "goals": [
+      "과거와 현재 비교",
+      "차이 설명"
+    ],
+    "level": "intermediate"
+  },
+  {
+    "id": "58c5c8ca-2484-594f-b76c-fe385438f545",
+    "mode": "opic",
+    "topic": "travel",
+    "question_type": "opinion",
+    "title": "여행 · 변화에 대한 의견",
+    "prompt": "How has the way people travel changed in recent years? Describe a change and explain its advantages and disadvantages.",
+    "goals": [
+      "변화 설명",
+      "근거 있는 의견"
+    ],
+    "level": "intermediate"
+  },
+  {
+    "id": "15d8b0dc-8766-5281-abaa-1154ea41e288",
+    "mode": "opic",
+    "topic": "music",
+    "question_type": "comparison",
+    "title": "음악 · 취향의 변화",
+    "prompt": "How has your taste in music changed since you were younger? Give specific examples.",
+    "goals": [
+      "비교",
+      "사례"
+    ],
+    "level": "intermediate"
+  },
+  {
+    "id": "35448fa7-585c-581c-a6b3-9410d0d9355e",
+    "mode": "opic",
+    "topic": "technology",
+    "question_type": "opinion",
+    "title": "기술 · 일상에 미친 영향",
+    "prompt": "What is one way technology has changed everyday life? Explain both a benefit and a problem.",
+    "goals": [
+      "의견",
+      "장단점"
+    ],
+    "level": "intermediate"
+  },
+  {
+    "id": "0aa810fb-f297-4b02-9550-2ce9055ddbe4",
+    "mode": "daily",
+    "topic": "food",
+    "question_type": "situation",
+    "title": "카페에서 주문하기",
+    "prompt": "You are at a cafe. Order a drink and ask one question about the menu.",
+    "goals": [
+      "정중하게 주문",
+      "메뉴 질문"
+    ],
+    "level": "beginner"
+  },
+  {
+    "id": "5fe3bc6d-99c9-4643-9c5c-223f9cbced0d",
+    "mode": "daily",
+    "topic": "work",
+    "question_type": "situation",
+    "title": "일정 변경 요청",
+    "prompt": "You need to reschedule a meeting. Explain why and suggest a new time.",
+    "goals": [
+      "사유 설명",
+      "새 일정 제안"
+    ],
+    "level": "intermediate"
+  },
+  {
+    "id": "ecd7ffb3-2a75-5313-9ea0-341a06cb393f",
+    "mode": "daily",
+    "topic": "food",
+    "question_type": "situation",
+    "title": "식당 예약",
+    "prompt": "Call a restaurant to reserve a table for two. Ask about the time and any dietary options.",
+    "goals": [
+      "예약",
+      "조건 확인"
+    ],
+    "level": "beginner"
+  },
+  {
+    "id": "7c6c1c63-764c-5030-bc55-3c6ea6e37321",
+    "mode": "daily",
+    "topic": "food",
+    "question_type": "situation",
+    "title": "잘못 나온 음식",
+    "prompt": "Your meal is different from what you ordered. Explain the problem politely and ask for help.",
+    "goals": [
+      "문제 설명",
+      "정중한 요청"
+    ],
+    "level": "intermediate"
+  },
+  {
+    "id": "dea786c9-8386-521d-9b25-92d06bfdfa28",
+    "mode": "daily",
+    "topic": "travel",
+    "question_type": "situation",
+    "title": "길 묻기",
+    "prompt": "Ask someone how to get to the nearest subway station. Confirm one part of the directions.",
+    "goals": [
+      "길 질문",
+      "이해 확인"
+    ],
+    "level": "beginner"
+  },
+  {
+    "id": "481c51db-6ea7-5086-b4e2-1835afb6dcd2",
+    "mode": "daily",
+    "topic": "travel",
+    "question_type": "situation",
+    "title": "호텔 체크인",
+    "prompt": "Check in at a hotel. Give your reservation details and ask about breakfast.",
+    "goals": [
+      "예약 확인",
+      "서비스 질문"
+    ],
+    "level": "beginner"
+  },
+  {
+    "id": "19089687-24ec-515b-aa86-84437655a360",
+    "mode": "daily",
+    "topic": "shopping",
+    "question_type": "situation",
+    "title": "옷 사이즈 교환",
+    "prompt": "You bought a shirt that is too small. Ask if you can exchange it and explain what you need.",
+    "goals": [
+      "교환 요청",
+      "필요 설명"
+    ],
+    "level": "beginner"
+  },
+  {
+    "id": "5deaf89a-913d-5ba1-86ad-2f85e0be82a9",
+    "mode": "daily",
+    "topic": "shopping",
+    "question_type": "situation",
+    "title": "환불 문의",
+    "prompt": "An item you ordered online arrived damaged. Explain the issue and ask about a refund.",
+    "goals": [
+      "상태 설명",
+      "환불 절차"
+    ],
+    "level": "intermediate"
+  },
+  {
+    "id": "39a1bc30-ac25-51ea-802c-3cc84056e186",
+    "mode": "daily",
+    "topic": "work",
+    "question_type": "situation",
+    "title": "새 동료와 첫 인사",
+    "prompt": "Introduce yourself to a new colleague. Ask about their role and suggest having lunch together.",
+    "goals": [
+      "인사",
+      "대화 이어가기"
+    ],
+    "level": "beginner"
+  },
+  {
+    "id": "8d37c0de-6f95-52b8-8ca3-c0c61b00f26e",
+    "mode": "daily",
+    "topic": "work",
+    "question_type": "situation",
+    "title": "업무 진행 상황 공유",
+    "prompt": "Give a short update about a project. Explain what is done, what is delayed, and your next step.",
+    "goals": [
+      "진행 상황",
+      "다음 행동"
+    ],
+    "level": "intermediate"
+  },
+  {
+    "id": "044c5a5f-3497-5c9e-8e1a-e4da39993f52",
+    "mode": "daily",
+    "topic": "daily",
+    "question_type": "situation",
+    "title": "진료 예약",
+    "prompt": "Call a clinic to make an appointment. Explain when you are available and ask what to bring.",
+    "goals": [
+      "예약",
+      "준비물 확인"
+    ],
+    "level": "beginner"
+  },
+  {
+    "id": "5223769f-3200-55ac-bb11-8977b2b0fcee",
+    "mode": "daily",
+    "topic": "daily",
+    "question_type": "situation",
+    "title": "주말 약속 잡기",
+    "prompt": "Invite a friend to do something this weekend. Suggest a place and agree on a time.",
+    "goals": [
+      "초대",
+      "시간 조율"
+    ],
+    "level": "beginner"
+  },
+  {
+    "id": "c65685b9-1528-5a0b-a8b5-3a538127c5ec",
+    "mode": "daily",
+    "topic": "travel",
+    "question_type": "situation",
+    "title": "분실물 문의",
+    "prompt": "You left a bag on a train. Describe it and ask how you can check the lost and found.",
+    "goals": [
+      "특징 설명",
+      "도움 요청"
+    ],
+    "level": "intermediate"
+  },
+  {
+    "id": "a27e2b01-6c4e-5287-9a92-82b788d12774",
+    "mode": "daily",
+    "topic": "daily",
+    "question_type": "situation",
+    "title": "이웃에게 부탁하기",
+    "prompt": "Ask a neighbor to keep the noise down tonight. Explain your situation politely.",
+    "goals": [
+      "사유",
+      "정중한 부탁"
+    ],
+    "level": "intermediate"
+  },
+  {
+    "id": "b7cb6c8f-def1-5c54-ac39-77439f16882e",
+    "mode": "opic",
+    "topic": "park",
+    "question_type": "opinion",
+    "title": "공공장소 · 사회적 역할",
+    "prompt": "Why are public parks important in a city? Discuss a challenge in maintaining them and suggest a way to address it.",
+    "goals": [
+      "사회적 주제 설명",
+      "근거와 대안"
+    ],
+    "level": "intermediate"
+  },
+  {
+    "id": "29c34921-bba1-5e5d-8e15-aca6adcb0f39",
+    "mode": "opic",
+    "topic": "home",
+    "question_type": "opinion",
+    "title": "주거 · 변화와 선택",
+    "prompt": "How have housing preferences changed in recent years? Explain possible reasons and discuss a trade-off people face when choosing a home.",
+    "goals": [
+      "사회적 주제 설명",
+      "근거와 대안"
+    ],
+    "level": "intermediate"
+  }
+]

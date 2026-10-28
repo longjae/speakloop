@@ -19,6 +19,7 @@ function Navigation() {
       <Stack.Screen name="sessions/[id]/review"/>
       <Stack.Screen name="sessions/[id]/coaching"/>
       <Stack.Screen name="opic/guide"/>
+      <Stack.Screen name="opic/mock"/>
       <Stack.Screen name="shadowing/[id]"/>
     </Stack.Protected>
     <Stack.Screen name="reset-password"/>

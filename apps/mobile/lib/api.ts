@@ -20,6 +20,8 @@ export type Scenario = {
   prompt: string;
   goals: string[];
   version: number;
+  topic?: string;
+  question_type?: string;
 };
 
 export type Utterance = { id: string; transcript_raw: string | null; transcript_edited: string | null; stt_status: 'processing' | 'ready' | 'empty' | 'failed' };
@@ -130,3 +132,5 @@ export function getAnalysisRecording(id:string):Promise<{playback_url:string;exp
 export type PracticeSentence = {index:number;text:string};
 export function getPracticeSentences(id:string):Promise<{items:PracticeSentence[];accent:Accent}> { return request(`/v1/analyses/${id}/sentences`); }
 export function createSentenceAudio(id:string,index:number):Promise<AudioGuide> { return request(`/v1/analyses/${id}/sentences/${index}/audio`,{method:'POST'}); }
+
+export function getQuestionAudio(id:string,accent:Accent):Promise<AudioGuide> { return request(`/v1/scenarios/${id}/audio`,{method:'POST',body:JSON.stringify({accent})}); }

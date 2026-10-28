@@ -146,7 +146,7 @@ async def list_scenarios(mode: str | None = None, level: str | None = None, user
         raise HTTPException(422, "Unsupported practice mode")
     if level is not None and level not in {"beginner", "intermediate"}:
         raise HTTPException(422, "Unsupported level")
-    params = {"active": "eq.true", "select": "id,mode,level,title,prompt,goals,version", "order": "title.asc", "limit": "50"}
+    params = {"active": "eq.true", "select": "id,mode,level,title,prompt,goals,version,topic,question_type", "order": "title.asc", "limit": "50"}
     if mode:
         params["mode"] = f"eq.{mode}"
     if level:
@@ -157,7 +157,7 @@ async def list_scenarios(mode: str | None = None, level: str | None = None, user
 
 @app.get("/v1/scenarios/{scenario_id}")
 async def get_scenario(scenario_id: UUID, user: tuple[str, str] = Depends(current_user)):
-    rows = await query("scenarios", user[1], params={"id": f"eq.{scenario_id}", "active": "eq.true", "select": "id,mode,level,title,prompt,goals,version"})
+    rows = await query("scenarios", user[1], params={"id": f"eq.{scenario_id}", "active": "eq.true", "select": "id,mode,level,title,prompt,goals,version,topic,question_type"})
     if not rows:
         raise HTTPException(404, "Scenario not found")
     return rows[0]
@@ -189,7 +189,7 @@ async def list_utterances(session_id: UUID, user: tuple[str, str] = Depends(curr
 @app.post("/v1/sessions/{session_id}/uploads", status_code=201)
 async def reserve_upload(session_id: UUID, payload: NewUpload, user: tuple[str, str] = Depends(current_user)):
     await owned_session(session_id, user)
-    if payload.mime_type != "audio/mp4" or not 1 <= payload.size_bytes <= 10_485_760 or not 1000 <= payload.duration_ms <= 120_000:
+    if payload.mime_type != "audio/mp4" or not 1 <= payload.size_bytes <= 10_485_760 or not 1000 <= payload.duration_ms <= 2_400_000:
         raise HTTPException(422, "Unsupported recording")
     existing = await query("audio_uploads", user[1], params={"user_id": f"eq.{user[0]}", "idempotency_key": f"eq.{payload.idempotency_key}", "select": "id,path,session_id"})
     if existing:
@@ -532,3 +532,30 @@ async def delete_session(session_id: UUID,user: tuple[str,str]=Depends(current_u
             await storage_request('DELETE',bucket,f'object/{bucket}',json={'prefixes':paths})
     await query('practice_sessions',key,'DELETE',params={'id':f'eq.{session_id}','user_id':f'eq.{user[0]}'})
     return {'deleted':True}
+
+
+class QuestionAudioRequest(BaseModel):
+    accent: Literal['en-US','en-GB'] = 'en-US'
+
+
+@app.post('/v1/scenarios/{scenario_id}/audio')
+async def question_audio(scenario_id: UUID,payload: QuestionAudioRequest,user: tuple[str,str]=Depends(current_user)):
+    scenario=await get_scenario(scenario_id,user)
+    key=service_key()
+    rows=await query('rpc/reserve_question_audio',key,'POST',body={'p_scenario':str(scenario_id),'p_version':scenario['version'],'p_accent':payload.accent})
+    row=rows[0]
+    scope={'scenario_id':f'eq.{scenario_id}','scenario_version':f"eq.{scenario['version']}",'accent':f'eq.{payload.accent}','attempts':f"eq.{row['attempts']}",'status':'eq.processing'}
+    if row['status']=='processing':
+        claimed=await query('scenario_question_audio',key,'PATCH',params={**scope,'worker_started_at':'is.null'},body={'worker_started_at':datetime.now(timezone.utc).isoformat()})
+        if claimed:
+            path=f"_questions/{scenario_id}/{scenario['version']}/{payload.accent}.wav"
+            try:
+                audio=await run_in_threadpool(generate_voice,scenario['prompt'],payload.accent)
+                await storage_request('POST','audio-guides',f'object/audio-guides/{path}',content=audio,headers={'Content-Type':'audio/wav','x-upsert':'true'})
+                updated=await query('scenario_question_audio',key,'PATCH',params=scope,body={'status':'ready','audio_path':path,'updated_at':datetime.now(timezone.utc).isoformat()})
+                if updated:row=updated[0]
+            except Exception as exc:
+                provider_failure('question_tts',exc)
+                failed=await query('scenario_question_audio',key,'PATCH',params=scope,body={'status':'failed','updated_at':datetime.now(timezone.utc).isoformat()})
+                if failed:row=failed[0]
+    return await guide_response({'id':str(scenario_id),'audio_status':row['status'],'audio_path':row.get('audio_path')})
