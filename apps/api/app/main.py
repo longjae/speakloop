@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 from app.coaching import RUBRIC_VERSION, generate_feedback, generate_voice
+from app.shadowing import practice_sentences
 
 app = FastAPI(title="SpeakLoop API", version="0.1.0")
 logger = logging.getLogger(__name__)
@@ -70,7 +71,7 @@ async def query(table: str, token: str, method: str = "GET", *, params=None, bod
         response = await client.request(method, f"{url}/rest/v1/{table}", headers=headers, params=params, json=body)
     if response.status_code >= 400:
         messages = {404: '분석할 원본 전사를 찾을 수 없습니다.', 422: '분석할 내용이 짧습니다. 8단어 이상으로 다시 말해 주세요.', 429: '코칭 요청 한도에 도달했습니다. 잠시 후 다시 시도해 주세요.'}
-        detail = messages.get(response.status_code, '분석을 시작할 수 없습니다.') if table in {'rpc/reserve_coaching','rpc/reserve_audio_coaching'} else 'Data request failed'
+        detail = messages.get(response.status_code, '분석을 시작할 수 없습니다.') if table in {'rpc/reserve_coaching','rpc/reserve_audio_coaching'} else '문장 음성을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.' if table=='rpc/reserve_sentence_guide' else 'Data request failed'
         raise HTTPException(503 if response.status_code >= 500 else response.status_code, detail)
     return response.json() if response.content else None
 
@@ -455,6 +456,46 @@ async def get_guide(analysis_id: UUID,user: tuple[str,str]=Depends(current_user)
     return await guide_response(await owned_analysis(analysis_id,user))
 
 
+@app.get('/v1/analyses/{analysis_id}/sentences')
+async def list_practice_sentences(analysis_id: UUID,user: tuple[str,str]=Depends(current_user)):
+    analysis=await owned_analysis(analysis_id,user)
+    if analysis['status']!='ready':raise HTTPException(409,'코칭이 완료된 뒤 따라하기를 시작해 주세요.')
+    text=(analysis.get('feedback_json') or {}).get('improved_example','')
+    return {'items':[{'index':i,'text':text} for i,text in enumerate(practice_sentences(text))],'accent':analysis.get('accent','en-US')}
+
+
+@app.post('/v1/analyses/{analysis_id}/sentences/{sentence_index}/audio')
+async def sentence_audio(analysis_id: UUID,sentence_index: int,user: tuple[str,str]=Depends(current_user)):
+    analysis=await owned_analysis(analysis_id,user)
+    if analysis['status']!='ready':raise HTTPException(409,'분석 완료 후 문장을 들을 수 있습니다.')
+    sentences=practice_sentences((analysis.get('feedback_json') or {}).get('improved_example',''))
+    if sentence_index<0 or sentence_index>=len(sentences):raise HTTPException(404,'연습 문장을 찾을 수 없습니다.')
+    key=service_key()
+    rows=await query('rpc/reserve_sentence_guide',key,'POST',body={'p_user':user[0],'p_analysis':str(analysis_id),'p_index':sentence_index,'p_text':sentences[sentence_index]})
+    row=rows[0]
+    scope={'analysis_id':f'eq.{analysis_id}','sentence_index':f'eq.{sentence_index}','attempts':f"eq.{row['attempts']}",'status':'eq.processing'}
+    if row['status']=='processing':
+        claimed=await query('analysis_sentence_guides',key,'PATCH',params={**scope,'worker_started_at':'is.null'},body={'worker_started_at':datetime.now(timezone.utc).isoformat()})
+        if claimed:
+            path=f"{user[0]}/{analysis['session_id']}/{analysis_id}/sentence-{sentence_index}.wav"
+            try:
+                audio=await run_in_threadpool(generate_voice,row['input_text'],analysis.get('accent','en-US'))
+                remaining=await query('analysis_sentence_guides',key,params={**scope,'select':'analysis_id'})
+                if not remaining:raise HTTPException(404,'연습 기록이 삭제됐습니다.')
+                await storage_request('POST','audio-guides',f'object/audio-guides/{path}',content=audio,headers={'Content-Type':'audio/wav','x-upsert':'true'})
+                updated=await query('analysis_sentence_guides',key,'PATCH',params=scope,body={'status':'ready','audio_path':path,'updated_at':datetime.now(timezone.utc).isoformat()})
+                if not updated:
+                    await storage_request('DELETE','audio-guides','object/audio-guides',json={'prefixes':[path]})
+                    raise HTTPException(404,'연습 기록이 삭제됐습니다.')
+                row=updated[0]
+            except Exception as exc:
+                provider_failure('sentence_tts',exc)
+                failed=await query('analysis_sentence_guides',key,'PATCH',params=scope,body={'status':'failed','updated_at':datetime.now(timezone.utc).isoformat()})
+                if not failed:raise HTTPException(404,'연습 기록이 삭제됐습니다.')
+                row=failed[0]
+    return await guide_response({'id':str(analysis_id),'audio_status':row['status'],'audio_path':row.get('audio_path')})
+
+
 def assert_deletable(rows: list[dict]):
     now=datetime.now(timezone.utc)
     for row in rows:
@@ -466,7 +507,10 @@ def assert_deletable(rows: list[dict]):
 @app.delete('/v1/analyses/{analysis_id}')
 async def delete_analysis(analysis_id: UUID,user: tuple[str,str]=Depends(current_user)):
     row=await owned_analysis(analysis_id,user)
-    assert_deletable([row])
+    sentences=await query('analysis_sentence_guides',service_key(),params={'analysis_id':f'eq.{analysis_id}','user_id':f'eq.{user[0]}','select':'status,updated_at,audio_path'})
+    assert_deletable([row,*sentences])
+    sentence_paths=[item['audio_path'] for item in sentences if item.get('audio_path')]
+    if sentence_paths:await storage_request('DELETE','audio-guides','object/audio-guides',json={'prefixes':sentence_paths})
     if row.get('audio_path'):
         await storage_request('DELETE','audio-guides','object/audio-guides',json={'prefixes':[row['audio_path']]})
     await query('analyses',service_key(),'DELETE',params={'id':f'eq.{analysis_id}','user_id':f'eq.{user[0]}'})
@@ -478,11 +522,12 @@ async def delete_session(session_id: UUID,user: tuple[str,str]=Depends(current_u
     await owned_session(session_id,user)
     key=service_key()
     analyses=await query('analyses',key,params={'session_id':f'eq.{session_id}','user_id':f'eq.{user[0]}','select':'status,updated_at,audio_status,audio_updated_at,audio_path'})
-    assert_deletable(analyses)
+    sentences=await query('analysis_sentence_guides',key,params={'session_id':f'eq.{session_id}','user_id':f'eq.{user[0]}','select':'status,updated_at,audio_path'})
+    assert_deletable([*analyses,*sentences])
     utterances=await query('utterances',key,params={'session_id':f'eq.{session_id}','user_id':f'eq.{user[0]}','select':'stt_status,updated_at'})
     assert_deletable([{'status':u['stt_status'],'updated_at':u['updated_at']} for u in utterances])
     uploads=await query('audio_uploads',key,params={'session_id':f'eq.{session_id}','user_id':f'eq.{user[0]}','select':'path'})
-    for bucket,paths in [('audio-guides',[a['audio_path'] for a in analyses if a.get('audio_path')]),('recordings',[u['path'] for u in uploads])]:
+    for bucket,paths in [('audio-guides',[a['audio_path'] for a in [*analyses,*sentences] if a.get('audio_path')]),('recordings',[u['path'] for u in uploads])]:
         if paths:
             await storage_request('DELETE',bucket,f'object/{bucket}',json={'prefixes':paths})
     await query('practice_sessions',key,'DELETE',params={'id':f'eq.{session_id}','user_id':f'eq.{user[0]}'})

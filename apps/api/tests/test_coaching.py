@@ -126,7 +126,9 @@ def test_cached_voice_uses_short_lived_owned_url(monkeypatch):
 def test_deletion_stops_when_storage_fails(monkeypatch):
     async def owned(*args):return row(audio_status='ready',audio_path='private.wav')
     async def fail(*args,**kwargs):raise HTTPException(503,'Storage unavailable')
-    async def query(*args,**kwargs):pytest.fail('metadata must not be deleted after storage failure')
+    async def query(*args,**kwargs):
+        if args[0]=='analysis_sentence_guides' and len(args)==2:return []
+        pytest.fail('metadata must not be deleted after storage failure')
     monkeypatch.setattr(main,'owned_analysis',owned)
     monkeypatch.setattr(main,'storage_request',fail)
     monkeypatch.setattr(main,'query',query)
@@ -168,6 +170,7 @@ def test_session_delete_removes_both_storage_buckets_before_rows(monkeypatch):
         assert kwargs['params'].get('user_id')==f'eq.{USER}'
         if method=='DELETE':calls.append('db-delete');return []
         if table=='analyses':return [row(audio_status='ready',audio_path='owned-guide.wav')]
+        if table=='analysis_sentence_guides':return [{'status':'ready','audio_path':'sentence.wav'}]
         if table=='utterances':return []
         if table=='audio_uploads':return [{'path':'owned-recording.m4a'}]
         pytest.fail(table)
@@ -177,7 +180,7 @@ def test_session_delete_removes_both_storage_buckets_before_rows(monkeypatch):
     monkeypatch.setattr(main,'query',query)
     monkeypatch.setattr(main,'storage_request',storage)
     assert TestClient(main.app).delete(f'/v1/sessions/{SESSION}').status_code==200
-    assert calls==[('audio-guides',['owned-guide.wav']),('recordings',['owned-recording.m4a']),'db-delete']
+    assert calls==[('audio-guides',['owned-guide.wav','sentence.wav']),('recordings',['owned-recording.m4a']),'db-delete']
 
 
 def test_audio_evidence_requires_valid_intervals_and_uncertainty():
@@ -234,3 +237,79 @@ def test_invalid_accent_is_rejected_before_database(monkeypatch):
     async def query(*args,**kwargs):pytest.fail('invalid preference reached database')
     monkeypatch.setattr(main,'query',query)
     assert TestClient(main.app).post(f'/v1/sessions/{SESSION}/analysis',json={'utterance_id':UTTERANCE,'accent':'invalid'}).status_code==422
+
+
+def test_sentence_split_abbreviations_decimals_and_limit():
+    from app.shadowing import practice_sentences
+    assert practice_sentences('Dr. Smith paid 3.50 dollars. It was good!')==['Dr. Smith paid 3.50 dollars.','It was good!']
+    assert len(practice_sentences('Hi. '*30))==12
+    assert practice_sentences('   ')==[]
+
+
+def test_sentence_audio_cached_and_scoped(monkeypatch):
+    async def owned(*args):return row()
+    async def query(table,token,method='GET',**kwargs):
+        assert table=='rpc/reserve_sentence_guide'
+        assert kwargs['body']['p_user']==USER
+        assert kwargs['body']['p_text']==FEEDBACK['improved_example']
+        return [{'status':'ready','attempts':1,'audio_path':'private-sentence.wav'}]
+    async def storage(*args,**kwargs):
+        assert kwargs['json']=={'expiresIn':300}
+        return SimpleNamespace(json=lambda:{'signedURL':'https://example.invalid/short-lived'})
+    monkeypatch.setattr(main,'owned_analysis',owned)
+    monkeypatch.setattr(main,'query',query)
+    monkeypatch.setattr(main,'storage_request',storage)
+    monkeypatch.setattr(main,'generate_voice',lambda *args:pytest.fail('cached sentence must not regenerate'))
+    result=TestClient(main.app).post(f'/v1/analyses/{ANALYSIS}/sentences/0/audio')
+    assert result.status_code==200 and result.json()['status']=='ready'
+    assert 'input_text' not in result.json()
+
+
+def test_sentence_audio_rejects_other_owner_and_invalid_index(monkeypatch):
+    async def reject(*args):raise HTTPException(404,'missing')
+    monkeypatch.setattr(main,'owned_analysis',reject)
+    monkeypatch.setattr(main,'generate_voice',lambda *args:pytest.fail('unowned synthesis'))
+    assert TestClient(main.app).post(f'/v1/analyses/{ANALYSIS}/sentences/0/audio').status_code==404
+    async def owned(*args):return row()
+    monkeypatch.setattr(main,'owned_analysis',owned)
+    for index in [-1,12]:
+        assert TestClient(main.app).post(f'/v1/analyses/{ANALYSIS}/sentences/{index}/audio').status_code==404
+
+
+def test_sentence_concurrent_worker_does_not_synthesize_twice(monkeypatch):
+    async def owned(*args):return row()
+    async def query(table,token,method='GET',**kwargs):
+        if table=='rpc/reserve_sentence_guide':return [{'status':'processing','attempts':1}]
+        assert kwargs['params']['worker_started_at']=='is.null'
+        return []
+    monkeypatch.setattr(main,'owned_analysis',owned)
+    monkeypatch.setattr(main,'query',query)
+    monkeypatch.setattr(main,'generate_voice',lambda *args:pytest.fail('duplicate provider call'))
+    result=TestClient(main.app).post(f'/v1/analyses/{ANALYSIS}/sentences/0/audio')
+    assert result.status_code==200 and result.json()['status']=='processing'
+
+
+@pytest.mark.parametrize('provider_fails',[False,True])
+def test_sentence_synthesis_uses_selected_text_and_persists_state(monkeypatch,provider_fails):
+    example='I enjoy walking. It helps me relax.'
+    stored={'status':'processing','attempts':1,'input_text':'I enjoy walking.'}
+    async def owned(*args):return row(feedback_json={**FEEDBACK,'improved_example':example},accent='en-GB')
+    async def query(table,token,method='GET',**kwargs):
+        if table=='rpc/reserve_sentence_guide':return [stored.copy()]
+        if method=='PATCH':stored.update(kwargs['body'])
+        return [stored.copy()]
+    def generate(text,accent):
+        assert text=='I enjoy walking.' and accent=='en-GB'
+        if provider_fails:raise RuntimeError('test failure')
+        return b'RIFF-test-wave'
+    async def storage(method,bucket,path,**kwargs):
+        if method=='POST' and 'content' in kwargs:assert kwargs['content']==b'RIFF-test-wave'
+        return SimpleNamespace(json=lambda:{'signedURL':'https://example.invalid/sentence'})
+    monkeypatch.setattr(main,'owned_analysis',owned)
+    monkeypatch.setattr(main,'query',query)
+    monkeypatch.setattr(main,'generate_voice',generate)
+    monkeypatch.setattr(main,'storage_request',storage)
+    result=TestClient(main.app).post(f'/v1/analyses/{ANALYSIS}/sentences/0/audio')
+    assert result.status_code==200
+    assert result.json()['status']==('failed' if provider_fails else 'ready')
+    assert bool(result.json()['playback_url']) is not provider_fails

@@ -173,6 +173,7 @@ export default function AnalysisDetail() {
       </>:null}
       {step==='example'?<>
         <View style={ui.card}><Text style={ui.label}>나의 답변을 다듬은 예문</Text><Text style={styles.example}>{feedback.improved_example}</Text></View>
+        <Button variant="primary" title="한 문장씩 듣고 따라하기" onPress={()=>router.push({pathname:'/shadowing/[id]',params:{id}})}/>
         <Text>학습용 예문입니다. 문장을 외우기보다 내 경험에 맞게 바꿔 말해 보세요.</Text>
         <Button variant="primary" title={playback.playing?'음성 일시정지':'AI 예문 듣기'} loading={voiceBusy} onPress={listen}/>
         <Button title={`재생 속도 ${speed}배`} onPress={changeSpeed}/>

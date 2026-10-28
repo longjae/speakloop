@@ -126,3 +126,7 @@ export function deleteAnalysis(id: string): Promise<{ deleted: boolean }> { retu
 export function deleteSession(id: string): Promise<{ deleted: boolean }> { return request(`/v1/sessions/${id}`, { method: 'DELETE' }); }
 
 export function getAnalysisRecording(id:string):Promise<{playback_url:string;expires_in:number;duration_ms:number}> { return request(`/v1/analyses/${id}/recording`); }
+
+export type PracticeSentence = {index:number;text:string};
+export function getPracticeSentences(id:string):Promise<{items:PracticeSentence[];accent:Accent}> { return request(`/v1/analyses/${id}/sentences`); }
+export function createSentenceAudio(id:string,index:number):Promise<AudioGuide> { return request(`/v1/analyses/${id}/sentences/${index}/audio`,{method:'POST'}); }
